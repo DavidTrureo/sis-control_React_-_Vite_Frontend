@@ -1,61 +1,33 @@
 import React, { useState } from 'react';
-import { ArrowRight, Lock, User, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Lock, User, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { api, TokenService } from '../services/api';
 import logoImg from '../assets/logo.png';
 
 export default function Login() {
-  const [step, setStep] = useState<1 | 2>(1);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   
   const [loading, setLoading] = useState(false);
-  const [checkingUser, setCheckingUser] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Paso 1: Validar si el usuario o correo existe en el sistema
-  const handleNextStep = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-
-    const trimmedUser = username.trim();
-    if (!trimmedUser) {
-      setError('Por favor, ingresa tu usuario o correo electrónico.');
-      return;
-    }
-
-    setCheckingUser(true);
-    try {
-      // POST http://localhost:8080/api/auth/check-username
-      const response = await api.post('/api/auth/check-username', { username: trimmedUser });
-      if (response.data && response.data.exists) {
-        setStep(2);
-      } else {
-        setError('El usuario o correo ingresado no está registrado.');
-      }
-    } catch (err: any) {
-      console.error('Error checking username:', err);
-      setError('Ocurrió un error al verificar tu cuenta. Intenta de nuevo.');
-    } finally {
-      setCheckingUser(false);
-    }
-  };
-
-  // Paso 2: Iniciar sesión y autenticar credenciales
+  // Iniciar sesión y autenticar credenciales
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
+    const trimmedUser = username.trim();
     const trimmedPassword = password.trim();
-    if (!trimmedPassword) {
-      setError('Por favor, ingresa tu contraseña.');
+
+    if (!trimmedUser || !trimmedPassword) {
+      setError('Por favor, completa tanto tu usuario como tu contraseña.');
       return;
     }
 
     setLoading(true);
     try {
       const response = await api.post('/api/auth/login', {
-        username: username.trim(),
+        username: trimmedUser,
         password: trimmedPassword,
       });
 
@@ -84,14 +56,14 @@ export default function Login() {
           setError('Acceso denegado. Este portal es exclusivo para personal de administración y supervisión.');
         }
       } else {
-        setError(data.message || 'Credenciales inválidas.');
+        setError(data.message || 'Usuario o contraseña incorrectos. Por favor, verifica tus datos e intenta nuevamente.');
       }
     } catch (err: any) {
       console.error('Error logging in:', err);
       if (err.response && err.response.data && err.response.data.message) {
         setError(err.response.data.message);
       } else {
-        setError('Error al conectar con el servidor. Verifica tu contraseña.');
+        setError('Usuario o contraseña incorrectos. Verifica que no tengas la tecla Bloq Mayús activada o que tu usuario esté bien escrito.');
       }
     } finally {
       setLoading(false);
@@ -111,7 +83,16 @@ export default function Login() {
             <img src={logoImg} alt="SIS-Control Logo" style={{ width: '48px', height: '48px', objectFit: 'contain' }} />
           </div>
           <h1 style={styles.title}>SIS-CONTROL</h1>
-          <p style={styles.subtitle}>Panel de Control Administrativo</p>
+          <p style={styles.subtitle}>Sistema Integral de Seguridad</p>
+
+          <div style={{ marginTop: '20px', textAlign: 'center' }}>
+            <h2 style={{ fontSize: '18px', fontWeight: '700', color: '#ffffff', marginBottom: '4px' }}>
+              Iniciar Sesión
+            </h2>
+            <p style={{ fontSize: '13px', color: '#94a3b8' }}>
+              Ingresa tus credenciales para acceder al panel de control
+            </p>
+          </div>
         </div>
 
         {error && (
@@ -120,90 +101,63 @@ export default function Login() {
           </div>
         )}
 
-        {step === 1 ? (
-          /* PASO 1: Identificación */
-          <form onSubmit={handleNextStep} style={styles.form}>
-            <div style={styles.inputGroup}>
-              <label style={styles.label}>Usuario o Correo Electrónico</label>
-              <div style={styles.inputWrapper}>
-                <User size={18} style={styles.inputIcon} />
-                <input
-                  type="text"
-                  placeholder="ej. admin@siscontrol.cl"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="input-premium"
-                  style={{ paddingLeft: '44px' }}
-                  disabled={checkingUser}
-                />
-              </div>
+        <form onSubmit={handleLogin} style={styles.form}>
+          <div style={styles.inputGroup}>
+            <label style={styles.label}>Usuario o Correo Electrónico</label>
+            <div style={styles.inputWrapper}>
+              <User size={18} style={styles.inputIcon} />
+              <input
+                type="text"
+                placeholder="ej. admin@siscontrol.cl"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="input-premium"
+                style={{ paddingLeft: '44px' }}
+                disabled={loading}
+                autoComplete="username"
+                autoCapitalize="none"
+                required
+              />
             </div>
+          </div>
 
-            <button type="submit" className="btn-primary" style={styles.submitBtn} disabled={checkingUser}>
-              {checkingUser ? (
-                <>
-                  <Loader2 size={18} className="animate-spin" style={styles.spinner} />
-                  Verificando...
-                </>
-              ) : (
-                <>
-                  Continuar
-                  <ArrowRight size={18} />
-                </>
-              )}
-            </button>
-          </form>
-        ) : (
-          /* PASO 2: Contraseña */
-          <form onSubmit={handleLogin} style={styles.form}>
-            <div style={styles.userBadge}>
-              <User size={14} color="#94a3b8" />
-              <span style={styles.userBadgeText}>{username}</span>
-              <button 
-                type="button" 
-                onClick={() => { setStep(1); setError(null); setPassword(''); }}
-                style={styles.changeUserBtn}
+          <div style={styles.inputGroup}>
+            <label style={styles.label}>Contraseña</label>
+            <div style={styles.inputWrapper}>
+              <Lock size={18} style={styles.inputIcon} />
+              <input
+                type={showPassword ? 'text' : 'password'}
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="input-premium"
+                style={{ paddingLeft: '44px', paddingRight: '44px' }}
+                disabled={loading}
+                autoComplete="current-password"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={styles.eyeBtn}
+                title={showPassword ? "Ocultar contraseña" : "Ver contraseña"}
               >
-                Cambiar
+                {showPassword ? <EyeOff size={18} color="#94a3b8" /> : <Eye size={18} color="#94a3b8" />}
               </button>
             </div>
+          </div>
 
-            <div style={styles.inputGroup}>
-              <label style={styles.label}>Contraseña</label>
-              <div style={styles.inputWrapper}>
-                <Lock size={18} style={styles.inputIcon} />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="input-premium"
-                  style={{ paddingLeft: '44px', paddingRight: '44px' }}
-                  disabled={loading}
-                  autoFocus
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  style={styles.eyeBtn}
-                >
-                  {showPassword ? <EyeOff size={18} color="#94a3b8" /> : <Eye size={18} color="#94a3b8" />}
-                </button>
-              </div>
-            </div>
-
-            <button type="submit" className="btn-primary" style={styles.submitBtn} disabled={loading}>
-              {loading ? (
-                <>
-                  <Loader2 size={18} className="spin-animation" style={styles.spinner} />
-                  Iniciando Sesión...
-                </>
-              ) : (
-                'Ingresar al Sistema'
-              )}
-            </button>
-          </form>
-        )}
+          <button type="submit" className="btn-primary" style={styles.submitBtn} disabled={loading}>
+            {loading ? (
+              <>
+                <Loader2 size={18} className="spin-animation" style={styles.spinner} />
+                Iniciando Sesión...
+              </>
+            ) : (
+              'Iniciar Sesión'
+            )}
+          </button>
+        </form>
       </div>
     </div>
   );
