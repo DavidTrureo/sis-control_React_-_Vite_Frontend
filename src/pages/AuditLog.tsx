@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { api } from '../services/api';
+import { api, downloadFile } from '../services/api';
+import { useToast } from '../context/ToastContext';
 import { 
   ClipboardList, Search, Filter, RefreshCw, Clock, User, 
-  Database, Activity, ToggleRight, Trash2, Key, Info, ShieldAlert
+  Database, Activity, ToggleRight, Trash2, Key, Info, ShieldAlert, Download
 } from 'lucide-react';
 
 interface AuditLogEntry {
@@ -23,16 +24,33 @@ export default function AuditLog() {
   const [actionFilter, setActionFilter] = useState('ALL');
   const [entityFilter, setEntityFilter] = useState('ALL');
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
+  const toast = useToast();
+
 
   const fetchLogs = async () => {
     setLoading(true);
     try {
       const res = await api.get('/api/audit-logs');
-      setLogs(res.data || []);
+      setLogs(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error('Error fetching audit logs:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleExportCsv = async () => {
+    setExporting(true);
+    try {
+      toast.info('Generando archivo de auditoría...');
+      await downloadFile('/api/export/audit-logs/csv', `bitacora_auditoria_${new Date().toISOString().slice(0,10)}.csv`);
+      toast.success('Bitácora descargada con éxito');
+    } catch (err) {
+      console.error('Error exportando logs:', err);
+      toast.error('No se pudo descargar la bitácora');
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -145,8 +163,29 @@ export default function AuditLog() {
             </select>
           </div>
 
-          <button onClick={fetchLogs} className="btn-secondary" style={styles.refreshBtn}>
+          <button onClick={fetchLogs} className="btn-secondary" style={styles.refreshBtn} title="Recargar logs">
             <RefreshCw size={16} className={loading ? 'spin-animation' : ''} />
+          </button>
+
+          <button 
+            onClick={handleExportCsv} 
+            className="btn-primary" 
+            disabled={exporting || loading}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '8px 14px',
+              borderRadius: '8px',
+              fontSize: '13px',
+              fontWeight: '600',
+              cursor: exporting ? 'not-allowed' : 'pointer',
+              opacity: exporting ? 0.7 : 1,
+            }}
+            title="Exportar Bitácora completa a Excel / CSV"
+          >
+            <Download size={15} />
+            <span>{exporting ? 'Exportando...' : 'Exportar Excel'}</span>
           </button>
         </div>
       </div>

@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { api, TokenService } from '../services/api';
+import { useToast } from '../context/ToastContext';
 import { 
   ShieldAlert, Loader2, Users, MapPin, 
-  RefreshCw, CheckCircle2, AlertTriangle, X, Send, Activity
+  RefreshCw, CheckCircle2, AlertTriangle, X, Send, Activity, Plus, Smartphone
 } from 'lucide-react';
 
 interface ActiveShift {
@@ -24,6 +25,7 @@ interface ActiveRound {
 }
 
 export default function SupervisorConsole() {
+  const toast = useToast();
   const [activeShifts, setActiveShifts] = useState<ActiveShift[]>([]);
   const [activeRounds, setActiveRounds] = useState<ActiveRound[]>([]);
   
@@ -46,9 +48,75 @@ export default function SupervisorConsole() {
   const [modalLoading, setModalLoading] = useState(false);
   const [modalError, setModalError] = useState('');
 
+  // Estados Modal Asignar Turno e Instalación (Push Notifications)
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [guardsList, setGuardsList] = useState<any[]>([]);
+  const [installationsList, setInstallationsList] = useState<any[]>([]);
+  const [selectedGuardId, setSelectedGuardId] = useState<number | ''>('');
+  const [selectedInstallationId, setSelectedInstallationId] = useState<number | ''>('');
+  const [assignNotes, setAssignNotes] = useState('');
+  const [assignLoading, setAssignLoading] = useState(false);
+  const [assignModalLoading, setAssignModalLoading] = useState(false);
+  const [assignError, setAssignError] = useState('');
+
   const currentUser = TokenService.getUser();
   const userRole = currentUser?.role || 'SUPERVISOR';
   const editorId = currentUser?.userId || currentUser?.id || 1;
+
+  // Abrir modal de asignación y cargar guardias e instalaciones
+  const handleOpenAssignModal = async () => {
+    setShowAssignModal(true);
+    setAssignError('');
+    setAssignModalLoading(true);
+    try {
+      const [resGuards, resInst] = await Promise.all([
+        api.get('/api/usuarios/role/GUARD'),
+        api.get('/api/instalaciones')
+      ]);
+      const guards = Array.isArray(resGuards.data) ? resGuards.data : [];
+      const insts = (Array.isArray(resInst.data) ? resInst.data : []).filter((i: any) => i.status === 1);
+      setGuardsList(guards);
+      setInstallationsList(insts);
+      if (guards.length > 0) setSelectedGuardId(guards[0].id);
+      if (insts.length > 0) setSelectedInstallationId(insts[0].id);
+    } catch (err) {
+      console.error('Error fetching guards/installations:', err);
+      setAssignError('Error al cargar la lista de guardias e instalaciones.');
+    } finally {
+      setAssignModalLoading(false);
+    }
+  };
+
+  // Confirmar asignación de turno con despacho de notificación Push
+  const handleConfirmAssign = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedGuardId || !selectedInstallationId) {
+      setAssignError('Debes seleccionar un guardia y una instalación.');
+      return;
+    }
+
+    try {
+      setAssignLoading(true);
+      setAssignError('');
+      const res = await api.post('/api/supervisor-guard/asignar-turno', {
+        supervisorId: editorId,
+        guardId: Number(selectedGuardId),
+        installationId: Number(selectedInstallationId),
+        notas: assignNotes.trim()
+      });
+
+      toast.success(res.data?.mensaje || 'Turno e instalación asignados exitosamente con alerta Push enviada.');
+      setShowAssignModal(false);
+      setAssignNotes('');
+      await fetchDashboardData(false);
+    } catch (err: any) {
+      console.error('Error assigning shift/installation:', err);
+      const msg = err.response?.data?.error || err.response?.data?.message || 'Error al procesar la asignación.';
+      setAssignError(msg);
+    } finally {
+      setAssignLoading(false);
+    }
+  };
 
   // Cargar datos del dashboard correspondientes
   const fetchDashboardData = async (showLoader = true) => {
@@ -103,9 +171,10 @@ export default function SupervisorConsole() {
       setActionLoadingId(shift.id);
       await api.put(`/api/rondas/jornada/cancelar/${shift.id}?adminId=${editorId}`);
       await fetchDashboardData(false);
+      toast.success(`Jornada del guardia ${shift.guardName} cerrada administrativamente.`);
     } catch (err) {
       console.error('Error closing shift administratively:', err);
-      alert('Error al cerrar la jornada. Inténtalo de nuevo.');
+      toast.error('Error al cerrar la jornada. Inténtalo de nuevo.');
     } finally {
       setActionLoadingId(null);
     }
@@ -185,17 +254,29 @@ export default function SupervisorConsole() {
           </div>
         </div>
 
-        <button 
-          onClick={() => fetchDashboardData(false)}
-          className="btn-secondary"
-          style={styles.refreshBtn}
-          disabled={refreshing}
-          title="Sincronizar consola de operaciones"
-          aria-label="Sincronizar consola de operaciones"
-        >
-          <RefreshCw size={14} className={refreshing ? 'spin-animation' : ''} />
-          <span>{refreshing ? 'Actualizando...' : 'Sincronizar'}</span>
-        </button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button
+            onClick={handleOpenAssignModal}
+            className="btn-primary"
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 16px' }}
+            title="Asignar turno e instalación y notificar por Push"
+          >
+            <Plus size={16} />
+            <span>Asignar Turno (Push)</span>
+          </button>
+
+          <button 
+            onClick={() => fetchDashboardData(false)}
+            className="btn-secondary"
+            style={styles.refreshBtn}
+            disabled={refreshing}
+            title="Sincronizar consola de operaciones"
+            aria-label="Sincronizar consola de operaciones"
+          >
+            <RefreshCw size={14} className={refreshing ? 'spin-animation' : ''} />
+            <span>{refreshing ? 'Actualizando...' : 'Sincronizar'}</span>
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -402,6 +483,139 @@ export default function SupervisorConsole() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================================================
+         MODAL DE ASIGNACIÓN DE TURNO E INSTALACIÓN (PUSH NOTIFICATIONS)
+         ========================================================================== */}
+      {showAssignModal && (
+        <div style={styles.modalOverlay}>
+          <div className="glass-panel" style={{ ...styles.modalContent, maxWidth: '520px' }}>
+            <div style={styles.modalHeader}>
+              <div style={styles.modalTitleRow}>
+                <Smartphone size={20} color="#3b82f6" />
+                <h3 style={styles.modalTitle}>Asignar Turno e Instalación</h3>
+              </div>
+              <button onClick={() => setShowAssignModal(false)} style={styles.closeBtn} title="Cerrar modal" aria-label="Cerrar modal">
+                <X size={20} color="#94a3b8" />
+              </button>
+            </div>
+
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              padding: '12px 14px',
+              borderRadius: '8px',
+              backgroundColor: 'rgba(59, 130, 246, 0.1)',
+              border: '1px solid rgba(59, 130, 246, 0.25)',
+              marginBottom: '16px'
+            }}>
+              <Send size={18} color="#60a5fa" />
+              <p style={{ margin: 0, fontSize: '12.5px', color: '#bfdbfe', lineHeight: 1.4 }}>
+                Al asignar, se enviará una <strong>Notificación Push Nativa</strong> instantánea al smartphone del guardia indicándole su sede y turno.
+              </p>
+            </div>
+
+            {assignError && (
+              <div style={styles.errorAlert}>
+                <AlertTriangle size={16} />
+                <span>{assignError}</span>
+              </div>
+            )}
+
+            {assignModalLoading ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px', gap: '10px' }}>
+                <Loader2 size={32} className="spin-animation" color="#3b82f6" />
+                <span style={{ fontSize: '13px', color: '#94a3b8' }}>Cargando personal e instalaciones...</span>
+              </div>
+            ) : (
+              <form onSubmit={handleConfirmAssign} style={styles.modalForm}>
+                <div style={styles.inputGroup}>
+                  <label style={styles.label}>Guardia a Asignar</label>
+                  <select
+                    value={selectedGuardId}
+                    onChange={(e) => setSelectedGuardId(Number(e.target.value))}
+                    className="input-premium"
+                    style={{ width: '100%' }}
+                    required
+                  >
+                    {guardsList.length === 0 ? (
+                      <option value="">No hay guardias disponibles</option>
+                    ) : (
+                      guardsList.map((g) => (
+                        <option key={g.id} value={g.id}>
+                          {g.fullName} ({g.rut || g.username})
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
+
+                <div style={styles.inputGroup}>
+                  <label style={styles.label}>Instalación / Sede</label>
+                  <select
+                    value={selectedInstallationId}
+                    onChange={(e) => setSelectedInstallationId(Number(e.target.value))}
+                    className="input-premium"
+                    style={{ width: '100%' }}
+                    required
+                  >
+                    {installationsList.length === 0 ? (
+                      <option value="">No hay instalaciones activas</option>
+                    ) : (
+                      installationsList.map((inst) => (
+                        <option key={inst.id} value={inst.id}>
+                          {inst.name} - {inst.address || 'Sin dirección'}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
+
+                <div style={styles.inputGroup}>
+                  <label style={styles.label}>Instrucciones / Notas del Turno (Opcional)</label>
+                  <textarea
+                    value={assignNotes}
+                    onChange={(e) => setAssignNotes(e.target.value)}
+                    placeholder="Ej: Cobertura de accesos peatonales, rondas cada 45 minutos."
+                    className="input-premium"
+                    style={styles.textarea}
+                  />
+                </div>
+
+                <div style={styles.modalActions}>
+                  <button
+                    type="button"
+                    onClick={() => setShowAssignModal(false)}
+                    className="btn-secondary"
+                    style={styles.modalActionBtn}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn-primary"
+                    style={styles.modalActionBtn}
+                    disabled={assignLoading}
+                  >
+                    {assignLoading ? (
+                      <>
+                        <Loader2 size={16} className="spin-animation" />
+                        <span>Asignando y Notificando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send size={15} />
+                        <span>Asignar y Enviar Push</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}

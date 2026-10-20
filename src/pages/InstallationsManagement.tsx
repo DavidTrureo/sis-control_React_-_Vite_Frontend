@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { api, TokenService } from '../services/api';
+import { useToast } from '../context/ToastContext';
 import { 
   Building2, Plus, Edit, Loader2, MapPin, 
   Layers, ShieldCheck, X, Info, 
-  Radio, Camera, ShieldAlert, ToggleLeft, ToggleRight
+  Radio, Camera, ShieldAlert, ToggleLeft, ToggleRight, QrCode, Printer
 } from 'lucide-react';
 
 interface Installation {
@@ -50,6 +51,9 @@ export default function InstallationsManagement() {
   const [showCheckModal, setShowCheckModal] = useState(false);
   const [checkModalMode, setCheckModalMode] = useState<'create' | 'edit'>('create');
   const [editingCheckId, setEditingCheckId] = useState<number | null>(null);
+  const [qrModalCheckpoint, setQrModalCheckpoint] = useState<any | null>(null);
+  const toast = useToast();
+
 
   // Formulario Instalaciones
   const [instName, setInstName] = useState('');
@@ -137,16 +141,16 @@ export default function InstallationsManagement() {
         (position) => {
           setInstLat(position.coords.latitude.toString());
           setInstLng(position.coords.longitude.toString());
-          alert("Coordenadas GPS capturadas con éxito.");
+          toast.success("Coordenadas GPS capturadas con éxito.");
         },
         (error) => {
           console.error("Error capturing GPS location: ", error);
-          alert("No se pudo obtener la ubicación. Por favor, concede permisos de GPS al navegador.");
+          toast.error("No se pudo obtener la ubicación. Por favor, concede permisos de GPS al navegador.");
         },
         { enableHighAccuracy: true }
       );
     } else {
-      alert("La geolocalización no está soportada en este navegador.");
+      toast.warning("La geolocalización no está soportada en este navegador.");
     }
   };
 
@@ -168,11 +172,12 @@ export default function InstallationsManagement() {
     try {
       setLoadingInst(true);
       const res = await api.get('/api/instalaciones');
-      setInstallations(res.data || []);
+      const list = Array.isArray(res.data) ? res.data : [];
+      setInstallations(list);
       
       // Auto-seleccionar la primera si hay y no hay ninguna seleccionada
-      if (res.data && res.data.length > 0 && !selectedInst) {
-        setSelectedInst(res.data[0]);
+      if (list.length > 0 && !selectedInst) {
+        setSelectedInst(list[0]);
       }
     } catch (err) {
       console.error('Error fetching installations:', err);
@@ -186,7 +191,7 @@ export default function InstallationsManagement() {
     try {
       setLoadingCheck(true);
       const res = await api.get(`/api/instalaciones/${instId}/checkpoints`);
-      setCheckpoints(res.data || []);
+      setCheckpoints(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error('Error fetching checkpoints:', err);
     } finally {
@@ -560,6 +565,14 @@ export default function InstallationsManagement() {
                         <td style={styles.tdCenter}>
                           <div style={styles.actionRow}>
                             <button 
+                              onClick={() => setQrModalCheckpoint(checkItem)}
+                              style={{ ...styles.editIconBtn, color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.3)' }}
+                              title="Ver e Imprimir Código QR para este punto"
+                              aria-label="Ver Código QR"
+                            >
+                              <QrCode size={14} />
+                            </button>
+                            <button 
                               onClick={() => handleOpenEditCheck(checkItem)}
                               style={styles.editIconBtn}
                               title="Editar checkpoint"
@@ -913,6 +926,106 @@ export default function InstallationsManagement() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {qrModalCheckpoint && (
+        <div style={styles.modalOverlay}>
+          <div className="glass-panel" style={{ ...styles.modalContent, maxWidth: '440px', textAlign: 'center' }}>
+            <div style={styles.modalHeader}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <QrCode size={20} color="#38bdf8" />
+                <h3 style={styles.modalTitle}>Cartel de Checkpoint QR</h3>
+              </div>
+              <button onClick={() => setQrModalCheckpoint(null)} style={styles.closeBtn} title="Cerrar modal">
+                <X size={20} color="#94a3b8" />
+              </button>
+            </div>
+
+            <div style={{ padding: '20px 10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+              <div style={{ backgroundColor: '#ffffff', padding: '16px', borderRadius: '12px', boxShadow: '0 10px 25px rgba(0,0,0,0.4)' }}>
+                <img 
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(qrModalCheckpoint.nfcTagCode || '')}`} 
+                  alt="QR Code Checkpoint"
+                  style={{ width: '220px', height: '220px', display: 'block' }}
+                />
+              </div>
+
+              <div>
+                <h4 style={{ color: '#ffffff', fontSize: '17px', fontWeight: '800', margin: '0 0 6px' }}>
+                  {qrModalCheckpoint.name}
+                </h4>
+                <div style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '8px' }}>
+                  Sede: <strong style={{ color: '#e2e8f0' }}>{selectedInst?.name}</strong>
+                </div>
+                <div style={{ 
+                  backgroundColor: 'rgba(56, 189, 248, 0.1)', 
+                  border: '1px solid rgba(56, 189, 248, 0.25)',
+                  borderRadius: '6px',
+                  padding: '6px 12px',
+                  color: '#38bdf8',
+                  fontSize: '12px',
+                  fontFamily: 'monospace'
+                }}>
+                  Código: {qrModalCheckpoint.nfcTagCode}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', width: '100%', marginTop: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const printWindow = window.open('', '_blank');
+                    if (printWindow) {
+                      printWindow.document.write(`
+                        <html>
+                          <head>
+                            <title>SIS-Control - Checkpoint ${qrModalCheckpoint.name}</title>
+                            <style>
+                              body { font-family: sans-serif; text-align: center; padding: 40px; margin: 0; }
+                              .placard { border: 4px solid #000; border-radius: 16px; padding: 30px; max-width: 450px; margin: 0 auto; }
+                              .header { font-size: 24px; font-weight: 900; letter-spacing: 1px; margin-bottom: 8px; color: #0f172a; }
+                              .sub { font-size: 14px; color: #475569; margin-bottom: 24px; text-transform: uppercase; }
+                              img { width: 260px; height: 260px; margin-bottom: 20px; }
+                              .code { font-size: 14px; font-family: monospace; background: #f1f5f9; padding: 8px; border-radius: 6px; }
+                              .inst { font-size: 18px; font-weight: bold; margin-bottom: 6px; }
+                              .warn { font-size: 11px; color: #64748b; margin-top: 20px; }
+                            </style>
+                          </head>
+                          <body>
+                            <div class="placard">
+                              <div class="header">🛡️ SIS-CONTROL</div>
+                              <div class="sub">Punto de Control de Patrullaje Oficial</div>
+                              <div class="inst">${selectedInst?.name || 'Instalación'}</div>
+                              <h2>${qrModalCheckpoint.name}</h2>
+                              <img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrModalCheckpoint.nfcTagCode || '')}" />
+                              <div class="code">TAG ID: ${qrModalCheckpoint.nfcTagCode}</div>
+                              <div class="warn">Escanee este código con la App SIS-Control para registrar el checkpoint de la ronda perimetral.</div>
+                            </div>
+                            <script>window.print();</script>
+                          </body>
+                        </html>
+                      `);
+                      printWindow.document.close();
+                    }
+                  }}
+                  className="btn-primary"
+                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                >
+                  <Printer size={16} />
+                  <span>Imprimir Cartel QR</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setQrModalCheckpoint(null)}
+                  className="btn-secondary"
+                  style={{ padding: '8px 16px' }}
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

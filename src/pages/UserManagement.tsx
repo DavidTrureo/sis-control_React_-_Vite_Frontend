@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { api, TokenService } from '../services/api';
-import { Users, UserPlus, ToggleLeft, ToggleRight, Edit, Loader2, Search, X, Mail, ShieldAlert } from 'lucide-react';
+import { api, downloadFile, TokenService } from '../services/api';
+import { useToast } from '../context/ToastContext';
+import { Users, UserPlus, ToggleLeft, ToggleRight, Edit, Loader2, Search, X, Mail, ShieldAlert, Download } from 'lucide-react';
 
 interface User {
   id: number;
@@ -18,6 +19,22 @@ export default function UserManagement() {
   
   const [loading, setLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const toast = useToast();
+
+  const handleExportUsers = async () => {
+    try {
+      setExporting(true);
+      await downloadFile('/api/export/users/csv', `Dotacion_Usuarios_SIS_${new Date().toISOString().slice(0, 10)}.csv`);
+      toast.success('Dotación de personal exportada exitosamente a Excel/CSV.');
+    } catch (err: any) {
+      console.error('Error al exportar:', err);
+      toast.error('No se pudo exportar la dotación de usuarios.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
@@ -39,7 +56,7 @@ export default function UserManagement() {
   const fetchUsers = async () => {
     try {
       const res = await api.get('/api/usuarios');
-      setUsers(res.data || []);
+      setUsers(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error('Error fetching users:', err);
     } finally {
@@ -145,10 +162,11 @@ export default function UserManagement() {
         setUsers(prev => 
           prev.map(u => u.id === userId ? { ...u, status: res.data.status } : u)
         );
+        toast.success(`Estado del usuario actualizado a ${res.data.status === 1 ? 'Activo' : 'Inactivo'}`);
       }
     } catch (err) {
       console.error('Error toggling status:', err);
-      alert('No se pudo modificar el estado del usuario.');
+      toast.error('No se pudo modificar el estado del usuario.');
     } finally {
       setActionLoadingId(null);
     }
@@ -178,10 +196,22 @@ export default function UserManagement() {
           />
         </div>
 
-        <button onClick={handleOpenCreate} className="btn-primary">
-          <UserPlus size={18} />
-          <span>Agregar Nuevo Usuario</span>
-        </button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button 
+            onClick={handleExportUsers} 
+            className="btn-secondary" 
+            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+            disabled={exporting}
+            title="Exportar dotación de personal a Excel"
+          >
+            <Download size={18} />
+            <span>{exporting ? 'Exportando...' : 'Exportar Dotación'}</span>
+          </button>
+          <button onClick={handleOpenCreate} className="btn-primary">
+            <UserPlus size={18} />
+            <span>Agregar Nuevo Usuario</span>
+          </button>
+        </div>
       </div>
 
       {/* LISTA/TABLA DE USUARIOS */}

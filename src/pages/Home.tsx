@@ -3,6 +3,8 @@ import { Users, CheckCircle, Clock, ShieldAlert, Activity, Sparkles, Printer, Bu
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, BarChart, Bar, Cell, Legend, LineChart, Line } from 'recharts';
 import { api } from '../services/api';
 import logoImg from '../assets/logo.png';
+import { useToast } from '../context/ToastContext';
+
 
 // Tipos para los datos locales
 interface DashboardStats {
@@ -73,6 +75,7 @@ function isToday(dateStr: string): boolean {
 }
 
 export default function Home({ onNavigate }: HomeProps) {
+  const toast = useToast();
   const [stats, setStats] = useState<DashboardStats>({
     totalGuards: 0,
     activeShiftsCount: 0,
@@ -384,7 +387,7 @@ export default function Home({ onNavigate }: HomeProps) {
       printWindow.document.close();
       printWindow.focus();
     } else {
-      alert('Por favor, permite las ventanas emergentes (pop-ups) para generar el PDF.');
+      toast.warning('Por favor, permite las ventanas emergentes (pop-ups) en tu navegador para generar el PDF.');
     }
   };
 

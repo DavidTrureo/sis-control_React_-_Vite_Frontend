@@ -239,7 +239,7 @@ export default function RealTimeMonitor() {
     // 1. Cargar instalaciones fijas con su propio try-catch
     try {
       const resInst = await api.get('/api/instalaciones');
-      instList = resInst.data || [];
+      instList = Array.isArray(resInst.data) ? resInst.data : [];
       setInstallations(instList);
     } catch (err) {
       console.error('Error fetching installations on monitor:', err);
@@ -253,7 +253,7 @@ export default function RealTimeMonitor() {
         ? '/api/reportes/dashboard-admin' 
         : `/api/reportes/dashboard-supervisor/${currentUserId}`;
       const resStats = await api.get(endpoint);
-      shiftsList = resStats.data?.activeShiftsList || [];
+      shiftsList = Array.isArray(resStats.data?.activeShiftsList) ? resStats.data.activeShiftsList : [];
       setActiveShifts(shiftsList);
     } catch (err) {
       console.error('Error fetching shifts list:', err);
@@ -263,7 +263,7 @@ export default function RealTimeMonitor() {
     let detailedRounds: any[] = [];
     try {
       const resRondas = await api.get('/api/rondas/buscar');
-      const roundItems = resRondas.data || [];
+      const roundItems = Array.isArray(resRondas.data) ? resRondas.data : [];
       const activeSummaryList = roundItems.filter((r: any) => r.endTime === 'En progreso');
 
       const detailedRoundsPromises = activeSummaryList.map(async (summary: any) => {
@@ -361,8 +361,8 @@ export default function RealTimeMonitor() {
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
             {/* A. Renderizar TODAS las Instalaciones fijas de la base de datos */}
-            {installations
-              .filter(inst => inst.latitude !== null && inst.latitude !== undefined && inst.longitude !== null && inst.longitude !== undefined)
+            {(Array.isArray(installations) ? installations : [])
+              .filter(inst => inst && inst.latitude !== null && inst.latitude !== undefined && inst.longitude !== null && inst.longitude !== undefined)
               .map((inst) => (
                 <Marker 
                   key={`inst-${inst.id}`} 
@@ -387,8 +387,8 @@ export default function RealTimeMonitor() {
               ))
             }
             {/* B. Renderizar Guardias en Jornada (Activos en Ronda o En Espera) */}
-            {activeShifts
-              .filter(shift => shift.latitude !== null && shift.latitude !== undefined && shift.longitude !== null && shift.longitude !== undefined)
+            {(Array.isArray(activeShifts) ? activeShifts : [])
+              .filter(shift => shift && shift.latitude !== null && shift.latitude !== undefined && shift.longitude !== null && shift.longitude !== undefined)
               .map((shift) => {
                 const currentRound = activeRounds.find(r => r.guardName === shift.guardName);
                 const lat = currentRound ? currentRound.latitude : Number(shift.latitude);
@@ -564,13 +564,13 @@ export default function RealTimeMonitor() {
               )}
 
               {/* Sección B: En Espera */}
-              {activeShifts.filter(s => !activeRounds.some(r => r.guardName === s.guardName)).length > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: activeRounds.length > 0 ? '16px' : '0' }}>
+              {(Array.isArray(activeShifts) ? activeShifts : []).filter(s => !(Array.isArray(activeRounds) ? activeRounds : []).some(r => r.guardName === s.guardName)).length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: (Array.isArray(activeRounds) ? activeRounds : []).length > 0 ? '16px' : '0' }}>
                   <span style={{ fontSize: '11px', color: '#f59e0b', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    🟡 En Espera / Disponible ({activeShifts.filter(s => !activeRounds.some(r => r.guardName === s.guardName)).length})
+                    🟡 En Espera / Disponible ({(Array.isArray(activeShifts) ? activeShifts : []).filter(s => !(Array.isArray(activeRounds) ? activeRounds : []).some(r => r.guardName === s.guardName)).length})
                   </span>
-                  {activeShifts
-                    .filter(s => !activeRounds.some(r => r.guardName === s.guardName))
+                  {(Array.isArray(activeShifts) ? activeShifts : [])
+                    .filter(s => !(Array.isArray(activeRounds) ? activeRounds : []).some(r => r.guardName === s.guardName))
                     .map((shift) => (
                       <div 
                         key={`list-shift-${shift.id}`} 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { api, TokenService } from '../services/api';
-import { AlertOctagon, ShieldAlert, CheckCircle, Search, Filter, Camera, X, Check, Loader2, MapPin, Clock, User } from 'lucide-react';
+import { api, TokenService, downloadFile } from '../services/api';
+import { useToast } from '../context/ToastContext';
+import { AlertOctagon, ShieldAlert, CheckCircle, Search, Filter, Camera, X, Check, Loader2, MapPin, Clock, User, Download } from 'lucide-react';
 
 interface Incident {
   id: number;
@@ -38,7 +39,7 @@ export default function AlertsAndIncidents() {
   const fetchIncidents = async () => {
     try {
       const res = await api.get('/api/incidents');
-      setIncidents(res.data || []);
+      setIncidents(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error('Error fetching incidents list:', err);
     } finally {
@@ -53,10 +54,27 @@ export default function AlertsAndIncidents() {
     return () => clearInterval(interval);
   }, []);
 
+  const [exporting, setExporting] = useState(false);
+  const toast = useToast();
+
   const handleOpenResolveModal = (incident: Incident) => {
     setSelectedIncident(incident);
     setResolvingNote('');
     setShowResolveModal(true);
+  };
+
+  const handleExportCsv = async () => {
+    setExporting(true);
+    try {
+      toast.info('Generando reporte de incidentes...');
+      await downloadFile('/api/export/incidents/csv', `reporte_incidentes_${new Date().toISOString().slice(0,10)}.csv`);
+      toast.success('Reporte de incidentes descargado con éxito');
+    } catch (err) {
+      console.error('Error exportando incidentes:', err);
+      toast.error('No se pudo descargar el reporte de incidentes');
+    } finally {
+      setExporting(false);
+    }
   };
 
   const handleResolveAlert = async (e: React.FormEvent) => {
@@ -79,11 +97,12 @@ export default function AlertsAndIncidents() {
             : item
         )
       );
+      toast.success('Alerta e incidente resuelto satisfactoriamente');
       setShowResolveModal(false);
       setSelectedIncident(null);
     } catch (err) {
       console.error('Error resolving alert:', err);
-      alert('Error al resolver la alerta.');
+      toast.error('Error al resolver la alerta.');
     } finally {
       setResolvingId(null);
     }
@@ -213,6 +232,27 @@ export default function AlertsAndIncidents() {
               <option value="OTRO">Otros / Novedades</option>
             </select>
           </div>
+
+          <button 
+            onClick={handleExportCsv} 
+            className="btn-primary" 
+            disabled={exporting || loading}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '8px 14px',
+              borderRadius: '8px',
+              fontSize: '13px',
+              fontWeight: '600',
+              cursor: exporting ? 'not-allowed' : 'pointer',
+              opacity: exporting ? 0.7 : 1,
+            }}
+            title="Exportar listado de incidentes a Excel / CSV"
+          >
+            <Download size={15} />
+            <span>{exporting ? 'Exportando...' : 'Exportar Incidentes'}</span>
+          </button>
         </div>
       </div>
 

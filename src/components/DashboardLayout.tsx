@@ -2,6 +2,8 @@ import React, { useEffect, useState, useRef } from 'react';
 import { LayoutDashboard, MapPin, AlertOctagon, Users, LogOut, Bell, Building2, Activity, X, ClipboardList, Megaphone, User, Camera, Upload } from 'lucide-react';
 import { TokenService, api } from '../services/api';
 import logoImg from '../assets/logo.png';
+import { useToast } from '../context/ToastContext';
+import CopilotSIS from './CopilotSIS';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -258,7 +260,7 @@ export default function DashboardLayout({ children, activeTab, onTabChange, titl
     const fetchAlerts = async () => {
       try {
         const res = await api.get('/api/incidents');
-        const pending = (res.data || []).filter((inc: any) => inc.status === 0);
+        const pending = (Array.isArray(res.data) ? res.data : []).filter((inc: any) => inc.status === 0);
         setPendingAlerts(pending.slice(0, 8));
       } catch (e) { /* silent */ }
     };
@@ -278,6 +280,8 @@ export default function DashboardLayout({ children, activeTab, onTabChange, titl
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
+  const toast = useToast();
+
   const handleSendAnuncio = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!anuncioMensaje.trim()) return;
@@ -287,12 +291,12 @@ export default function DashboardLayout({ children, activeTab, onTabChange, titl
         mensaje: anuncioMensaje,
         senderId: user?.userId || user?.id
       });
-      alert('Aviso enviado con éxito a todos los dispositivos móviles');
+      toast.success('Aviso administrativo emitido con éxito a todos los dispositivos');
       setShowAnuncioModal(false);
       setAnuncioMensaje('');
     } catch (err) {
       console.error(err);
-      alert('Error al enviar el aviso administrativo');
+      toast.error('Error al emitir el aviso administrativo');
     } finally {
       setEnviandoAnuncio(false);
     }
@@ -871,6 +875,9 @@ export default function DashboardLayout({ children, activeTab, onTabChange, titl
           </div>
         </div>
       )}
+
+      {/* Copiloto de Inteligencia Artificial Táctico */}
+      <CopilotSIS />
     </div>
   );
 }
