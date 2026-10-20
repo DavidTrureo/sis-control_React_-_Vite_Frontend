@@ -79,18 +79,16 @@ export default function Login() {
       <div className="glass-panel" style={styles.loginBox}>
         {/* Encabezado Logo */}
         <div style={styles.header}>
-          <div style={styles.logoCircle}>
-            <img src={logoImg} alt="SIS-Control Logo" style={{ width: '48px', height: '48px', objectFit: 'contain' }} />
+          <div style={styles.logoBadge}>
+            <img src={logoImg} alt="SIS-Control" style={styles.logoImage} />
           </div>
-          <h1 style={styles.title}>SIS-CONTROL</h1>
-          <p style={styles.subtitle}>Sistema Integral de Seguridad</p>
 
-          <div style={{ marginTop: '20px', textAlign: 'center' }}>
-            <h2 style={{ fontSize: '18px', fontWeight: '700', color: '#ffffff', marginBottom: '4px' }}>
+          <div style={{ marginTop: '16px', textAlign: 'center' }}>
+            <h2 style={{ fontSize: '20px', fontWeight: '700', color: '#ffffff', marginBottom: '4px' }}>
               Iniciar Sesión
             </h2>
-            <p style={{ fontSize: '13px', color: '#94a3b8' }}>
-              Ingresa tus credenciales para acceder al panel de control
+            <p style={{ fontSize: '13.5px', color: '#94a3b8' }}>
+              Ingresa tus credenciales para continuar
             </p>
           </div>
         </div>
@@ -205,31 +203,24 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    marginBottom: '30px',
+    marginBottom: '20px',
   },
-  logoCircle: {
-    width: '64px',
-    height: '64px',
-    borderRadius: '50%',
-    backgroundColor: 'rgba(29, 78, 216, 0.1)',
-    border: '1px solid rgba(29, 78, 216, 0.2)',
+  logoBadge: {
+    backgroundColor: '#ffffff',
+    borderRadius: '18px',
+    padding: '12px 18px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: '16px',
-    boxShadow: '0 0 20px rgba(29, 78, 216, 0.2)',
-  },
-  title: {
-    fontSize: '24px',
-    fontWeight: '800',
-    color: '#ffffff',
-    letterSpacing: '1px',
+    boxShadow: '0 10px 25px rgba(0, 0, 0, 0.35), 0 0 20px rgba(29, 78, 216, 0.2)',
     marginBottom: '6px',
   },
-  subtitle: {
-    fontSize: '14px',
-    color: '#94a3b8',
-    fontWeight: '400',
+  logoImage: {
+    width: '135px',
+    height: 'auto',
+    maxHeight: '135px',
+    objectFit: 'contain',
+    display: 'block',
   },
   errorAlert: {
     backgroundColor: 'rgba(239, 68, 68, 0.1)',
