@@ -3,7 +3,8 @@ import { api, downloadFile } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { 
   ClipboardList, Search, Filter, RefreshCw, Clock, User, 
-  Database, Activity, ToggleRight, Trash2, Key, Info, ShieldAlert, Download
+  Database, Activity, ToggleRight, Trash2, Key, Info, ShieldAlert, Download,
+  CheckCircle2, LogIn, PlayCircle, Megaphone
 } from 'lucide-react';
 
 interface AuditLogEntry {
@@ -58,6 +59,39 @@ export default function AuditLog() {
     fetchLogs();
   }, []);
 
+  const getActionLabel = (action: string) => {
+    const labels: Record<string, string> = {
+      LOGIN: 'Inicio de Sesión',
+      CREATE: 'Registro Creado',
+      UPDATE: 'Actualización',
+      DELETE: 'Desactivación',
+      TOGGLE_STATUS: 'Cambio de Estado',
+      RESOLVE_INCIDENT: 'Incidente Resuelto',
+      REPORT_INCIDENT: 'Incidente Reportado',
+      SEND_ANNOUNCEMENT: 'Aviso Administrativo',
+      CHECK_IN: 'Entrada de Turno',
+      CHECK_OUT: 'Salida de Turno',
+      START_ROUND: 'Inicio de Ronda',
+      END_ROUND: 'Fin de Ronda',
+      SCAN_CHECKPOINT: 'Escaneo Punto NFC',
+      RECOVERY: 'Recuperación de Clave',
+    };
+    return labels[action] || action.replace(/_/g, ' ');
+  };
+
+  const getEntityLabel = (entity: string) => {
+    const labels: Record<string, string> = {
+      USER: 'Usuarios',
+      INSTALLATION: 'Instalaciones',
+      CHECKPOINT: 'Puntos NFC',
+      INCIDENT: 'Incidentes',
+      SHIFT: 'Turnos',
+      ROUND: 'Rondas',
+      SYSTEM: 'Sistema',
+    };
+    return labels[entity] || entity;
+  };
+
   const getActionIcon = (action: string) => {
     switch (action) {
       case 'LOGIN':
@@ -67,11 +101,21 @@ export default function AuditLog() {
       case 'UPDATE':
         return <Activity size={16} color="#eab308" />;
       case 'DELETE':
-        return <Trash2 size={16} color="#ef4444" />;
+        return <Trash2 size={16} color="#f59e0b" />;
       case 'TOGGLE_STATUS':
         return <ToggleRight size={16} color="#a78bfa" />;
       case 'RESOLVE_INCIDENT':
-        return <ShieldAlert size={16} color="#ec4899" />;
+        return <CheckCircle2 size={16} color="#10b981" />;
+      case 'REPORT_INCIDENT':
+        return <ShieldAlert size={16} color="#f59e0b" />;
+      case 'SEND_ANNOUNCEMENT':
+        return <Megaphone size={16} color="#8b5cf6" />;
+      case 'CHECK_IN':
+      case 'CHECK_OUT':
+        return <LogIn size={16} color="#06b6d4" />;
+      case 'START_ROUND':
+      case 'END_ROUND':
+        return <PlayCircle size={16} color="#38bdf8" />;
       default:
         return <Info size={16} color="#94a3b8" />;
     }
@@ -80,28 +124,40 @@ export default function AuditLog() {
   const getActionStyle = (action: string) => {
     switch (action) {
       case 'LOGIN':
-        return { backgroundColor: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6' };
+        return { backgroundColor: 'rgba(59, 130, 246, 0.12)', color: '#60a5fa' };
       case 'CREATE':
-        return { backgroundColor: 'rgba(16, 185, 129, 0.1)', color: '#10b981' };
-      case 'UPDATE':
-        return { backgroundColor: 'rgba(234, 179, 8, 0.1)', color: '#eab308' };
-      case 'DELETE':
-        return { backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' };
-      case 'TOGGLE_STATUS':
-        return { backgroundColor: 'rgba(167, 139, 250, 0.1)', color: '#a78bfa' };
       case 'RESOLVE_INCIDENT':
-        return { backgroundColor: 'rgba(236, 72, 153, 0.1)', color: '#ec4899' };
+      case 'END_ROUND':
+        return { backgroundColor: 'rgba(16, 185, 129, 0.12)', color: '#34d399' };
+      case 'UPDATE':
+      case 'RECOVERY':
+        return { backgroundColor: 'rgba(234, 179, 8, 0.12)', color: '#facc15' };
+      case 'REPORT_INCIDENT':
+      case 'DELETE':
+        return { backgroundColor: 'rgba(245, 158, 11, 0.12)', color: '#fbbf24' };
+      case 'TOGGLE_STATUS':
+      case 'SEND_ANNOUNCEMENT':
+        return { backgroundColor: 'rgba(167, 139, 250, 0.12)', color: '#c4b5fd' };
+      case 'CHECK_IN':
+      case 'CHECK_OUT':
+      case 'SCAN_CHECKPOINT':
+        return { backgroundColor: 'rgba(6, 182, 212, 0.12)', color: '#22d3ee' };
+      case 'START_ROUND':
+        return { backgroundColor: 'rgba(56, 189, 248, 0.12)', color: '#38bdf8' };
       default:
-        return { backgroundColor: 'rgba(148, 163, 184, 0.1)', color: '#94a3b8' };
+        return { backgroundColor: 'rgba(148, 163, 184, 0.12)', color: '#cbd5e1' };
     }
   };
 
   const filteredLogs = logs.filter(log => {
+    const q = search.toLowerCase();
     const matchesSearch = 
-      (log.userName || '').toLowerCase().includes(search.toLowerCase()) ||
-      (log.details || '').toLowerCase().includes(search.toLowerCase()) ||
-      (log.action || '').toLowerCase().includes(search.toLowerCase()) ||
-      (log.entity || '').toLowerCase().includes(search.toLowerCase());
+      (log.userName || '').toLowerCase().includes(q) ||
+      (log.details || '').toLowerCase().includes(q) ||
+      (log.action || '').toLowerCase().includes(q) ||
+      getActionLabel(log.action || '').toLowerCase().includes(q) ||
+      (log.entity || '').toLowerCase().includes(q) ||
+      getEntityLabel(log.entity || '').toLowerCase().includes(q);
 
     const matchesAction = actionFilter === 'ALL' || log.action === actionFilter;
     const matchesEntity = entityFilter === 'ALL' || log.entity === entityFilter;
@@ -136,13 +192,16 @@ export default function AuditLog() {
               aria-label="Filtrar por Acción"
             >
               <option value="ALL">Todas las Acciones</option>
-              <option value="LOGIN">LOGIN (Inicios de Sesión)</option>
-              <option value="CREATE">CREATE (Creaciones)</option>
-              <option value="UPDATE">UPDATE (Actualizaciones)</option>
-              <option value="DELETE">DELETE (Desactivaciones)</option>
-              <option value="TOGGLE_STATUS">TOGGLE_STATUS (Cambios Estado)</option>
-              <option value="RESOLVE_INCIDENT">RESOLVE_INCIDENT (Resolución SOS)</option>
-              <option value="SEND_ANNOUNCEMENT">SEND_ANNOUNCEMENT (Anuncios)</option>
+              <option value="LOGIN">Inicio de Sesión</option>
+              <option value="CHECK_IN">Entrada de Turno</option>
+              <option value="START_ROUND">Inicio de Ronda</option>
+              <option value="REPORT_INCIDENT">Incidente Reportado</option>
+              <option value="RESOLVE_INCIDENT">Incidente Resuelto</option>
+              <option value="CREATE">Registro Creado</option>
+              <option value="UPDATE">Actualización</option>
+              <option value="TOGGLE_STATUS">Cambio de Estado</option>
+              <option value="DELETE">Desactivación</option>
+              <option value="SEND_ANNOUNCEMENT">Aviso Administrativo</option>
             </select>
           </div>
 
@@ -157,9 +216,11 @@ export default function AuditLog() {
             >
               <option value="ALL">Todos los Módulos</option>
               <option value="USER">Usuarios</option>
+              <option value="SHIFT">Turnos</option>
+              <option value="ROUND">Rondas</option>
+              <option value="INCIDENT">Incidentes</option>
               <option value="INSTALLATION">Instalaciones</option>
               <option value="CHECKPOINT">Puntos NFC</option>
-              <option value="INCIDENT">Incidentes / SOS</option>
             </select>
           </div>
 
@@ -244,11 +305,11 @@ export default function AuditLog() {
                       ...getActionStyle(log.action)
                     }}>
                       {getActionIcon(log.action)}
-                      <span>{log.action}</span>
+                      <span>{getActionLabel(log.action)}</span>
                     </div>
                   </td>
                   <td style={styles.td}>
-                    <span style={styles.entityBadge}>{log.entity}</span>
+                    <span style={styles.entityBadge}>{getEntityLabel(log.entity)}</span>
                   </td>
                   <td style={styles.tdDetails}>
                     <span style={{ color: '#e2e8f0' }}>{log.details}</span>
