@@ -199,11 +199,13 @@ export default function Home({ onNavigate }: HomeProps) {
     // Incidentes de hoy
     todayIncidents.forEach((inc: any) => {
       const sevUpper = inc.severity?.toUpperCase();
+      const guardLabel = inc.username ? ` — ${inc.username}` : '';
+      const instLabel = inc.clientName ? `📍 ${inc.clientName} • ` : '';
       events.push({
         id: `inc-${inc.id}`,
         type: 'incident',
-        title: inc.title,
-        description: `${inc.description || ''} — Severidad: ${inc.severity}`,
+        title: `${inc.title}${guardLabel}`,
+        description: `${instLabel}${inc.description || ''} — Severidad: ${inc.severity}`,
         time: (inc.clientTimestamp || inc.createdAt) ? new Date(inc.clientTimestamp || inc.createdAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) : '',
         rawTime: inc.clientTimestamp || inc.createdAt,
         status: inc.severity,

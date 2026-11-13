@@ -504,8 +504,11 @@ export default function DashboardLayout({ children, activeTab, onTabChange, titl
                               color: alert.severity?.toUpperCase() === 'ALTA' ? '#ef4444' : '#eab308',
                             }}>{alert.severity}</span>
                           </div>
-                          <span style={{ color: '#64748b', fontSize: '12px' }}>
-                            {alert.clientTimestamp ? new Date(alert.clientTimestamp).toLocaleString('es-CL', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' }) : ''}
+                          <div style={{ color: '#cbd5e1', fontSize: '11.5px', fontWeight: '500', marginBottom: '3px' }}>
+                            👮 {alert.username || 'Guardia'} &bull; 📍 {alert.clientName || 'Sin sede'}
+                          </div>
+                          <span style={{ color: '#64748b', fontSize: '11.5px' }}>
+                            {(alert.clientTimestamp || alert.createdAt) ? new Date(alert.clientTimestamp || alert.createdAt).toLocaleString('es-CL', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' }) : ''}
                           </span>
                         </div>
                       ))

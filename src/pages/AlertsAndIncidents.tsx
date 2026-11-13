@@ -17,6 +17,9 @@ interface Incident {
   latitude?: number;
   longitude?: number;
   managedByName?: string;
+  username?: string;
+  clientName?: string;
+  checkpointName?: string;
 }
 
 export default function AlertsAndIncidents() {
@@ -111,8 +114,11 @@ export default function AlertsAndIncidents() {
 
   // Filtrar incidentes
   const filteredIncidents = incidents.filter(inc => {
-    const matchesSearch = inc.title.toLowerCase().includes(search.toLowerCase()) || 
-                          inc.description.toLowerCase().includes(search.toLowerCase());
+    const q = search.toLowerCase();
+    const matchesSearch = inc.title.toLowerCase().includes(q) || 
+                          inc.description.toLowerCase().includes(q) ||
+                          (inc.username && inc.username.toLowerCase().includes(q)) ||
+                          (inc.clientName && inc.clientName.toLowerCase().includes(q));
     
     const matchesSeverity = severityFilter === 'ALL' || inc.severity?.toUpperCase() === severityFilter;
     
@@ -149,8 +155,18 @@ export default function AlertsAndIncidents() {
               <div key={alertItem.id} style={styles.sosItem}>
                 <div style={styles.sosItemText}>
                   <strong style={styles.sosItemTitle}>{alertItem.title}</strong>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '14px', marginTop: '4px', marginBottom: '2px', fontSize: '13px', fontWeight: '700', color: '#fecaca' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                      <User size={14} color="#ffffff" />
+                      Guardia: {alertItem.username || 'No identificado'}
+                    </span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                      <MapPin size={14} color="#ffffff" />
+                      Instalación: {alertItem.clientName || 'Sin sede asignada'}
+                    </span>
+                  </div>
                   <p style={styles.sosItemDesc}>{alertItem.description}</p>
-                  <span style={styles.sosItemTime}>Reportado a las: {new Date(alertItem.clientTimestamp).toLocaleTimeString()}</span>
+                  <span style={styles.sosItemTime}>Reportado a las: {new Date(alertItem.clientTimestamp || alertItem.createdAt || '').toLocaleTimeString('es-CL')}</span>
                 </div>
                 <button 
                   onClick={() => handleOpenResolveModal(alertItem)}
@@ -311,6 +327,16 @@ export default function AlertsAndIncidents() {
               {/* Título e Info */}
               <div style={styles.cardBody}>
                 <h4 style={styles.incidentTitle}>{incident.title}</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', margin: '4px 0 6px 0', padding: '8px 10px', backgroundColor: 'rgba(255, 255, 255, 0.03)', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: '#e2e8f0', fontWeight: '600' }}>
+                    <User size={13} color="#3b82f6" />
+                    <span>Guardia: {incident.username || 'No especificado'}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#94a3b8', fontWeight: '500' }}>
+                    <MapPin size={13} color="#10b981" />
+                    <span>Instalación: {incident.clientName || 'Sin instalación'}{incident.checkpointName && incident.checkpointName !== 'N/A' ? ` • Punto: ${incident.checkpointName}` : ''}</span>
+                  </div>
+                </div>
                 <p style={styles.incidentDesc}>{incident.description}</p>
                 <span style={styles.incidentDate}>
                   Reportado: {(incident.clientTimestamp || incident.createdAt) ? new Date((incident.clientTimestamp || incident.createdAt)!).toLocaleString('es-CL') : 'Reciente'}
@@ -370,6 +396,9 @@ export default function AlertsAndIncidents() {
               </p>
               <div style={styles.alertDetailBox}>
                 <p style={styles.modalDetailTitle}>{selectedIncident.title}</p>
+                <p style={{ fontSize: '12.5px', color: '#cbd5e1', margin: '4px 0', fontWeight: '600' }}>
+                  👮 Guardia: {selectedIncident.username || 'No especificado'} &nbsp;|&nbsp; 📍 Instalación: {selectedIncident.clientName || 'Sin instalación'}
+                </p>
                 <p style={styles.modalDetailDesc}>{selectedIncident.description}</p>
               </div>
 
@@ -435,7 +464,15 @@ export default function AlertsAndIncidents() {
             <p style={{ color: '#94a3b8', fontSize: '14px', lineHeight: '1.6', marginBottom: '20px' }}>{detailIncident.description}</p>
 
             {/* Metadata */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px', padding: '12px', backgroundColor: 'rgba(255, 255, 255, 0.03)', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#e2e8f0', fontSize: '13px', fontWeight: '600' }}>
+                <User size={14} color="#3b82f6" />
+                <span>Guardia: {detailIncident.username || 'No especificado'}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#e2e8f0', fontSize: '13px', fontWeight: '600' }}>
+                <MapPin size={14} color="#10b981" />
+                <span>Instalación: {detailIncident.clientName || 'Sin instalación'}</span>
+              </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '13px' }}>
                 <Clock size={14} />
                 <span>Reportado: {(detailIncident.clientTimestamp || detailIncident.createdAt) ? new Date((detailIncident.clientTimestamp || detailIncident.createdAt)!).toLocaleString('es-CL') : 'Reciente'}</span>
@@ -449,13 +486,13 @@ export default function AlertsAndIncidents() {
               {(detailIncident.latitude && detailIncident.longitude) && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '13px' }}>
                   <MapPin size={14} />
-                  <span>Ubicación: {detailIncident.latitude.toFixed(4)}, {detailIncident.longitude.toFixed(4)}</span>
+                  <span>GPS: {detailIncident.latitude.toFixed(5)}, {detailIncident.longitude.toFixed(5)}</span>
                 </div>
               )}
               {detailIncident.roundExecutionId && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '13px' }}>
                   <CheckCircle size={14} />
-                  <span>Ronda #{detailIncident.roundExecutionId}</span>
+                  <span>{detailIncident.type === 'JORNADA' ? `Jornada #${detailIncident.roundExecutionId}` : `Ronda #${detailIncident.roundExecutionId}`}</span>
                 </div>
               )}
             </div>
