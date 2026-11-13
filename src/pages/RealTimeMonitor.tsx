@@ -1,16 +1,18 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import { api, TokenService } from '../services/api';
 import { Shield, MapPin, Navigation, Clock, User, Building2, CheckCircle2, Loader2 } from 'lucide-react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
-// Componente para re-centrar el mapa dinámicamente o ajustar la caja de límites (bounds)
-function ChangeView({ center, zoom }: { center: [number, number]; zoom: number }) {
+// Componente para re-centrar el mapa únicamente cuando hay una solicitud explícita (carga inicial o clic del usuario)
+function ChangeView({ center, zoom, trigger }: { center: [number, number]; zoom: number; trigger: number }) {
   const map = useMap();
   useEffect(() => {
-    map.setView(center, zoom);
-  }, [center, zoom, map]);
+    if (trigger > 0) {
+      map.flyTo(center, zoom, { duration: 0.6 });
+    }
+  }, [trigger]);
   return null;
 }
 
@@ -227,13 +229,16 @@ export default function RealTimeMonitor() {
   const [installations, setInstallations] = useState<any[]>([]);
   const [mapCenter, setMapCenter] = useState<[number, number]>([-33.4489, -70.6693]); // Santiago por defecto
   const [mapZoom, setMapZoom] = useState<number>(12);
+  const [focusTrigger, setFocusTrigger] = useState<number>(0);
   const [loading, setLoading] = useState(true);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const isInitialLoadRef = useRef(true);
 
   const currentUser = TokenService.getUser();
   const currentUserId = currentUser?.userId || 1;
-  const fetchRealTimeData = async () => {
-    setLoading(true);
+  const fetchRealTimeData = async (showLoader = false) => {
+    if (showLoader) {
+      setLoading(true);
+    }
     let instList: any[] = [];
     
     // 1. Cargar instalaciones fijas con su propio try-catch
@@ -318,16 +323,18 @@ export default function RealTimeMonitor() {
       detailedRounds = results.filter(r => r !== null);
       setActiveRounds(detailedRounds);
       
-      if (isInitialLoad && detailedRounds.length > 0) {
+      if (isInitialLoadRef.current && detailedRounds.length > 0) {
         setMapCenter([detailedRounds[0].latitude, detailedRounds[0].longitude]);
         setMapZoom(15);
-        setIsInitialLoad(false);
-      } else if (isInitialLoad && shiftsList.length > 0) {
+        setFocusTrigger(prev => prev + 1);
+        isInitialLoadRef.current = false;
+      } else if (isInitialLoadRef.current && shiftsList.length > 0) {
         const validShift = shiftsList.find(s => s.latitude && s.longitude);
         if (validShift) {
           setMapCenter([Number(validShift.latitude), Number(validShift.longitude)]);
           setMapZoom(15);
-          setIsInitialLoad(false);
+          setFocusTrigger(prev => prev + 1);
+          isInitialLoadRef.current = false;
         }
       }
     } catch (err) {
@@ -338,14 +345,15 @@ export default function RealTimeMonitor() {
   };
 
   useEffect(() => {
-    fetchRealTimeData();
-    const interval = setInterval(fetchRealTimeData, 15000);
+    fetchRealTimeData(true);
+    const interval = setInterval(() => fetchRealTimeData(false), 15000);
     return () => clearInterval(interval);
   }, []);
 
   const handleCenterMarker = (lat: number, lng: number) => {
     setMapCenter([lat, lng]);
     setMapZoom(16);
+    setFocusTrigger(prev => prev + 1);
   };
 
   return (
@@ -358,7 +366,7 @@ export default function RealTimeMonitor() {
             zoom={mapZoom} 
             scrollWheelZoom={true}
           >
-            <ChangeView center={mapCenter} zoom={mapZoom} />
+            <ChangeView center={mapCenter} zoom={mapZoom} trigger={focusTrigger} />
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
