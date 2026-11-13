@@ -257,6 +257,7 @@ export default function DashboardLayout({ children, activeTab, onTabChange, titl
   const notifRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    let lastVersion = 0;
     const fetchAlerts = async () => {
       try {
         const res = await api.get('/api/incidents');
@@ -264,9 +265,33 @@ export default function DashboardLayout({ children, activeTab, onTabChange, titl
         setPendingAlerts(pending.slice(0, 8));
       } catch (e) { /* silent */ }
     };
-    fetchAlerts();
-    const interval = setInterval(fetchAlerts, 10000);
-    return () => clearInterval(interval);
+    const init = async () => {
+      try {
+        const p = await api.get('/api/reportes/pulse');
+        if (p.data?.version) lastVersion = p.data.version;
+      } catch (e) {}
+      await fetchAlerts();
+    };
+    init();
+
+    const checkPulse = async () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      try {
+        const p = await api.get('/api/reportes/pulse');
+        if (p.data?.version && p.data.version !== lastVersion) {
+          lastVersion = p.data.version;
+          await fetchAlerts();
+        }
+      } catch (e) {}
+    };
+
+    const interval = setInterval(checkPulse, 10000);
+    const onVisible = () => { if (!document.hidden) checkPulse(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, []);
 
   // Close dropdown on outside click

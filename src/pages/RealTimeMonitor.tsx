@@ -232,6 +232,7 @@ export default function RealTimeMonitor() {
   const [focusTrigger, setFocusTrigger] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const isInitialLoadRef = useRef(true);
+  const lastPulseRef = useRef<number>(0);
 
   const currentUser = TokenService.getUser();
   const currentUserId = currentUser?.userId || 1;
@@ -239,6 +240,12 @@ export default function RealTimeMonitor() {
     if (showLoader) {
       setLoading(true);
     }
+    try {
+      const pulseRes = await api.get('/api/reportes/pulse');
+      if (pulseRes.data?.version) {
+        lastPulseRef.current = pulseRes.data.version;
+      }
+    } catch (e) {}
     let instList: any[] = [];
     
     // 1. Cargar instalaciones fijas con su propio try-catch
@@ -346,8 +353,31 @@ export default function RealTimeMonitor() {
 
   useEffect(() => {
     fetchRealTimeData(true);
-    const interval = setInterval(() => fetchRealTimeData(false), 15000);
-    return () => clearInterval(interval);
+
+    const checkPulseAndSync = async () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      try {
+        const res = await api.get('/api/reportes/pulse');
+        const remoteVersion = res.data?.version;
+        if (remoteVersion && remoteVersion !== lastPulseRef.current) {
+          lastPulseRef.current = remoteVersion;
+          await fetchRealTimeData(false);
+        }
+      } catch (e) {
+        // Fallback silencioso
+      }
+    };
+
+    const interval = setInterval(checkPulseAndSync, 10000);
+    const handleVisibilityChange = () => {
+      if (!document.hidden) checkPulseAndSync();
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   const handleCenterMarker = (lat: number, lng: number) => {

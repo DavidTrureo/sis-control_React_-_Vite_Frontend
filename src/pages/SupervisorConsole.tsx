@@ -150,14 +150,36 @@ export default function SupervisorConsole() {
   };
 
   useEffect(() => {
-    fetchDashboardData(true);
+    let lastVersion = 0;
+    const init = async () => {
+      try {
+        const p = await api.get('/api/reportes/pulse');
+        if (p.data?.version) lastVersion = p.data.version;
+      } catch (e) {}
+      await fetchDashboardData(true);
+    };
+    init();
 
-    // Auto-actualizar cada 20 segundos
-    const interval = setInterval(() => {
-      fetchDashboardData(false);
-    }, 20000);
+    // Auto-actualizar solo cuando el pulso en RAM indique cambios reales en la BD
+    const checkPulse = async () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      try {
+        const p = await api.get('/api/reportes/pulse');
+        if (p.data?.version && p.data.version !== lastVersion) {
+          lastVersion = p.data.version;
+          await fetchDashboardData(false);
+        }
+      } catch (e) {}
+    };
 
-    return () => clearInterval(interval);
+    const interval = setInterval(checkPulse, 12000);
+    const onVisible = () => { if (!document.hidden) checkPulse(); };
+    document.addEventListener('visibilitychange', onVisible);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, []);
 
   // Forzar cierre de jornada

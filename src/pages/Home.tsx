@@ -128,9 +128,34 @@ export default function Home({ onNavigate }: HomeProps) {
       }
     };
 
-    fetchData();
-    const interval = setInterval(fetchData, 15000);
-    return () => clearInterval(interval);
+    let lastVersion = 0;
+    const init = async () => {
+      try {
+        const p = await api.get('/api/reportes/pulse');
+        if (p.data?.version) lastVersion = p.data.version;
+      } catch (e) {}
+      await fetchData();
+    };
+    init();
+
+    const checkPulse = async () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      try {
+        const p = await api.get('/api/reportes/pulse');
+        if (p.data?.version && p.data.version !== lastVersion) {
+          lastVersion = p.data.version;
+          await fetchData();
+        }
+      } catch (e) {}
+    };
+
+    const interval = setInterval(checkPulse, 12000);
+    const onVisible = () => { if (!document.hidden) checkPulse(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, []);
 
   // Incidentes del día actual solamente

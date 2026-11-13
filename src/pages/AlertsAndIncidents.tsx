@@ -52,10 +52,34 @@ export default function AlertsAndIncidents() {
   };
 
   useEffect(() => {
-    fetchIncidents();
-    // Actualización automática de incidentes cada 8 segundos (tiempo real simulado)
-    const interval = setInterval(fetchIncidents, 8000);
-    return () => clearInterval(interval);
+    let lastVersion = 0;
+    const init = async () => {
+      try {
+        const p = await api.get('/api/reportes/pulse');
+        if (p.data?.version) lastVersion = p.data.version;
+      } catch (e) {}
+      await fetchIncidents();
+    };
+    init();
+
+    const checkPulse = async () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      try {
+        const p = await api.get('/api/reportes/pulse');
+        if (p.data?.version && p.data.version !== lastVersion) {
+          lastVersion = p.data.version;
+          await fetchIncidents();
+        }
+      } catch (e) {}
+    };
+
+    const interval = setInterval(checkPulse, 8000);
+    const onVisible = () => { if (!document.hidden) checkPulse(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, []);
 
   const [exporting, setExporting] = useState(false);
