@@ -10,6 +10,7 @@ interface Incident {
   severity: string;
   type: string;
   imageUrl?: string;
+  checklogImageUrl?: string;
   status: number; // 0 = Activo, >= 1 = Resuelto
   clientTimestamp: string;
   createdAt?: string;
@@ -43,7 +44,9 @@ export default function AlertsAndIncidents() {
   const fetchIncidents = async () => {
     try {
       const res = await api.get('/api/incidents');
-      setIncidents(Array.isArray(res.data) ? res.data : []);
+      const list = Array.isArray(res.data) ? res.data : [];
+      list.sort((a: Incident, b: Incident) => (b.id || 0) - (a.id || 0));
+      setIncidents(list);
     } catch (err) {
       console.error('Error fetching incidents list:', err);
     } finally {
@@ -368,9 +371,9 @@ export default function AlertsAndIncidents() {
               </div>
 
               {/* Imagen Adjunta */}
-              {incident.imageUrl ? (
-                <div style={styles.imageContainer} onClick={() => setZoomImage(incident.imageUrl!)}>
-                  <img src={incident.imageUrl} alt={incident.title} style={styles.image} />
+              {(incident.imageUrl || incident.checklogImageUrl) ? (
+                <div style={styles.imageContainer} onClick={(e) => { e.stopPropagation(); setZoomImage((incident.imageUrl || incident.checklogImageUrl)!); }}>
+                  <img src={incident.imageUrl || incident.checklogImageUrl} alt={incident.title} style={styles.image} />
                   <div style={styles.imageOverlay}>
                     <Camera size={20} color="#ffffff" />
                     <span>Ver Imagen Ampliada</span>
@@ -522,12 +525,12 @@ export default function AlertsAndIncidents() {
             </div>
 
             {/* Imagen */}
-            {detailIncident.imageUrl ? (
+            {(detailIncident.imageUrl || detailIncident.checklogImageUrl) ? (
               <div 
                 style={{ borderRadius: '10px', overflow: 'hidden', marginBottom: '20px', cursor: 'pointer', maxHeight: '300px' }}
-                onClick={() => { setZoomImage(detailIncident.imageUrl!); }}
+                onClick={() => { setZoomImage((detailIncident.imageUrl || detailIncident.checklogImageUrl)!); }}
               >
-                <img src={detailIncident.imageUrl} alt="Evidencia" style={{ width: '100%', objectFit: 'cover', borderRadius: '10px' }} />
+                <img src={detailIncident.imageUrl || detailIncident.checklogImageUrl} alt="Evidencia" style={{ width: '100%', objectFit: 'cover', borderRadius: '10px' }} />
               </div>
             ) : (
               <div style={{ ...styles.noImagePlaceholder, marginBottom: '20px' }}>

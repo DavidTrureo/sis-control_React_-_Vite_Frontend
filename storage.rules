@@ -4,9 +4,9 @@ service firebase.storage {
     // Solo permitir carga de evidencias y fotos de perfil en carpetas oficiales
     // Límite estricto de 2 MB por imagen y prohibición de borrado/sobreescritura de evidencia
     match /{folder}/{fileName} {
-      allow read: if folder in ['perfiles', 'incidentes', 'rondas'];
-      allow create: if folder in ['perfiles', 'incidentes', 'rondas']
-                    && request.resource.size < 2 * 1024 * 1024
+      allow read: if folder in ['perfiles', 'incidentes', 'rondas', 'evidencias'];
+      allow create: if folder in ['perfiles', 'incidentes', 'rondas', 'evidencias']
+                    && request.resource.size < 5 * 1024 * 1024
                     && request.resource.contentType.matches('image/.*');
       allow update, delete: if false;
     }

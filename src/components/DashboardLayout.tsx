@@ -255,14 +255,34 @@ export default function DashboardLayout({ children, activeTab, onTabChange, titl
   const [pendingAlerts, setPendingAlerts] = useState<any[]>([]);
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
+  const knownMaxAlertIdRef = useRef<number | null>(null);
+  const toast = useToast();
 
   useEffect(() => {
     let lastVersion = 0;
-    const fetchAlerts = async () => {
+    const fetchAlerts = async (isInitial = false) => {
       try {
         const res = await api.get('/api/incidents');
-        const pending = (Array.isArray(res.data) ? res.data : []).filter((inc: any) => inc.status === 0);
+        const list = Array.isArray(res.data) ? res.data : [];
+        list.sort((a: any, b: any) => (b.id || 0) - (a.id || 0));
+        const pending = list.filter((inc: any) => inc.status === 0);
         setPendingAlerts(pending.slice(0, 8));
+
+        const maxId = pending.length > 0 ? (pending[0].id || 0) : 0;
+        if (isInitial || knownMaxAlertIdRef.current === null) {
+          knownMaxAlertIdRef.current = maxId;
+        } else if (maxId > knownMaxAlertIdRef.current) {
+          const newOnes = pending.filter((inc: any) => (inc.id || 0) > (knownMaxAlertIdRef.current || 0));
+          knownMaxAlertIdRef.current = maxId;
+          newOnes.forEach((inc: any) => {
+            const meta = `${inc.username ? `Guardia: ${inc.username}` : ''}${inc.clientName ? ` • ${inc.clientName}` : ''}`;
+            if (inc.severity?.toUpperCase() === 'ALTA' || inc.title?.toUpperCase().includes('PÁNICO')) {
+              toast.error(`🚨 ${inc.title}${meta ? ` (${meta})` : ''}`);
+            } else {
+              toast.warning(`⚠️ ${inc.title}${meta ? ` (${meta})` : ''}`);
+            }
+          });
+        }
       } catch (e) { /* silent */ }
     };
     const init = async () => {
@@ -270,7 +290,7 @@ export default function DashboardLayout({ children, activeTab, onTabChange, titl
         const p = await api.get('/api/reportes/pulse');
         if (p.data?.version) lastVersion = p.data.version;
       } catch (e) {}
-      await fetchAlerts();
+      await fetchAlerts(true);
     };
     init();
 
@@ -280,12 +300,12 @@ export default function DashboardLayout({ children, activeTab, onTabChange, titl
         const p = await api.get('/api/reportes/pulse');
         if (p.data?.version && p.data.version !== lastVersion) {
           lastVersion = p.data.version;
-          await fetchAlerts();
+          await fetchAlerts(false);
         }
       } catch (e) {}
     };
 
-    const interval = setInterval(checkPulse, 10000);
+    const interval = setInterval(checkPulse, 8000);
     const onVisible = () => { if (!document.hidden) checkPulse(); };
     document.addEventListener('visibilitychange', onVisible);
     return () => {
@@ -304,8 +324,6 @@ export default function DashboardLayout({ children, activeTab, onTabChange, titl
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
-
-  const toast = useToast();
 
   const handleSendAnuncio = async (e: React.FormEvent) => {
     e.preventDefault();
