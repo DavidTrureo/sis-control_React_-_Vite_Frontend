@@ -140,9 +140,9 @@ export default function Home({ onNavigate }: HomeProps) {
 
   // Gráfico REAL de incidentes por severidad (solo hoy)
   const chartDataSeverity = useMemo(() => {
-    const alta = todayIncidents.filter(i => i.severity === 'ALTA').length;
-    const media = todayIncidents.filter(i => i.severity === 'MEDIA').length;
-    const baja = todayIncidents.filter(i => i.severity === 'BAJA').length;
+    const alta = todayIncidents.filter(i => i.severity?.toUpperCase() === 'ALTA').length;
+    const media = todayIncidents.filter(i => i.severity?.toUpperCase() === 'MEDIA').length;
+    const baja = todayIncidents.filter(i => i.severity?.toUpperCase() === 'BAJA').length;
     return [
       { name: 'Alta', Cantidad: alta, color: '#ef4444' },
       { name: 'Media', Cantidad: media, color: '#eab308' },
@@ -179,8 +179,14 @@ export default function Home({ onNavigate }: HomeProps) {
         const ts = r.startTime || r.createdAt;
         return ts && ts.startsWith(dayStr);
       });
-      const completed = dayRounds.filter((r: any) => r.status === 'COMPLETED' || r.status === 'COMPLETADA').length;
-      const cancelled = dayRounds.filter((r: any) => r.status === 'CANCELLED' || r.status === 'CANCELADA').length;
+      const completed = dayRounds.filter((r: any) => {
+        const isCancelledObs = r.observations && r.observations.includes('[CANCELACIÓN ADMINISTRATIVA]');
+        return (r.status === 'FINALIZADA' || r.status === 'COMPLETED' || r.status === 'COMPLETADA') && !isCancelledObs;
+      }).length;
+      const cancelled = dayRounds.filter((r: any) => {
+        const isCancelledObs = r.observations && r.observations.includes('[CANCELACIÓN ADMINISTRATIVA]');
+        return r.status === 'CANCELADA' || r.status === 'CANCELLED' || isCancelledObs;
+      }).length;
       days.push({ name: dayNames[d.getDay()], Completadas: completed, Canceladas: cancelled });
     }
     return days;
@@ -192,15 +198,16 @@ export default function Home({ onNavigate }: HomeProps) {
 
     // Incidentes de hoy
     todayIncidents.forEach((inc: any) => {
+      const sevUpper = inc.severity?.toUpperCase();
       events.push({
         id: `inc-${inc.id}`,
         type: 'incident',
         title: inc.title,
         description: `${inc.description || ''} — Severidad: ${inc.severity}`,
-        time: inc.clientTimestamp ? new Date(inc.clientTimestamp).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) : '',
+        time: (inc.clientTimestamp || inc.createdAt) ? new Date(inc.clientTimestamp || inc.createdAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) : '',
         rawTime: inc.clientTimestamp || inc.createdAt,
         status: inc.severity,
-        badgeColor: inc.severity === 'ALTA' ? '#ef4444' : inc.severity === 'MEDIA' ? '#eab308' : '#3b82f6',
+        badgeColor: sevUpper === 'ALTA' ? '#ef4444' : sevUpper === 'MEDIA' ? '#eab308' : '#3b82f6',
       });
     });
 
@@ -209,8 +216,8 @@ export default function Home({ onNavigate }: HomeProps) {
       events.push({
         id: `shift-${shift.id}`,
         type: 'shift',
-        title: `Jornada iniciada — ${shift.guardName || 'Guardia'}`,
-        description: `Instalación: ${shift.installationName || shift.location || 'N/A'}`,
+        title: `Jornada iniciada — ${shift.guardName || shift.worker?.fullName || 'Guardia'}`,
+        description: `Instalación: ${shift.installationName || shift.installation?.name || shift.location || 'N/A'}`,
         time: shift.entryTime ? new Date(shift.entryTime).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) : '',
         rawTime: shift.entryTime || shift.createdAt,
         status: 'JORNADA',
@@ -220,15 +227,18 @@ export default function Home({ onNavigate }: HomeProps) {
 
     // Rondas de hoy
     allRounds.filter(r => isToday(r.startTime || r.createdAt)).forEach((round: any) => {
+      const isCancelledObs = round.observations && round.observations.includes('[CANCELACIÓN ADMINISTRATIVA]');
+      const isCancelled = round.status === 'CANCELLED' || round.status === 'CANCELADA' || isCancelledObs;
+      const isCompleted = (round.status === 'FINALIZADA' || round.status === 'COMPLETED' || round.status === 'COMPLETADA') && !isCancelled;
       events.push({
         id: `round-${round.id}`,
         type: 'round',
-        title: `Ronda — ${round.guardName || 'Guardia'}`,
-        description: `Estado: ${round.status || 'N/A'} — ${round.installationName || round.location || ''}`,
+        title: `Ronda — ${round.guardName || round.worker?.fullName || 'Guardia'}`,
+        description: `Estado: ${isCancelled ? 'CANCELADA' : isCompleted ? 'COMPLETADA' : round.status || 'N/A'} — ${round.installationName || round.installation?.name || round.location || ''}`,
         time: round.startTime ? new Date(round.startTime).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) : '',
         rawTime: round.startTime || round.createdAt,
-        status: round.status === 'COMPLETED' || round.status === 'COMPLETADA' ? 'COMPLETADA' : round.status,
-        badgeColor: round.status === 'COMPLETED' || round.status === 'COMPLETADA' ? '#10b981' : round.status === 'CANCELLED' || round.status === 'CANCELADA' ? '#ef4444' : '#3b82f6',
+        status: isCancelled ? 'CANCELADA' : isCompleted ? 'COMPLETADA' : round.status,
+        badgeColor: isCompleted ? '#10b981' : isCancelled ? '#ef4444' : '#3b82f6',
       });
     });
 

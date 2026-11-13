@@ -10,8 +10,9 @@ interface Incident {
   severity: string;
   type: string;
   imageUrl?: string;
-  status: number; // 0 = Activo, 1 = Resuelto
+  status: number; // 0 = Activo, >= 1 = Resuelto
   clientTimestamp: string;
+  createdAt?: string;
   roundExecutionId?: number;
   latitude?: number;
   longitude?: number;
@@ -83,9 +84,9 @@ export default function AlertsAndIncidents() {
 
     setResolvingId(selectedIncident.id);
     try {
-      // PUT http://localhost:8080/api/incidents/{id}/status
+      // PUT /api/incidents/{id}/status -> status: 2 sincroniza con App Móvil y Web
       await api.put(`/api/incidents/${selectedIncident.id}/status`, {
-        status: 1, // Marcar como Resuelto
+        status: 2, // Marcar como Resuelto / Gestionado
         managedBy: user?.userId || 1,
       });
 
@@ -93,7 +94,7 @@ export default function AlertsAndIncidents() {
       setIncidents(prev => 
         prev.map(item => 
           item.id === selectedIncident.id 
-            ? { ...item, status: 1, managedByName: user?.fullName || 'Administrador' } 
+            ? { ...item, status: 2, managedByName: user?.fullName || 'Administrador' } 
             : item
         )
       );
@@ -113,11 +114,11 @@ export default function AlertsAndIncidents() {
     const matchesSearch = inc.title.toLowerCase().includes(search.toLowerCase()) || 
                           inc.description.toLowerCase().includes(search.toLowerCase());
     
-    const matchesSeverity = severityFilter === 'ALL' || inc.severity === severityFilter;
+    const matchesSeverity = severityFilter === 'ALL' || inc.severity?.toUpperCase() === severityFilter;
     
     const matchesStatus = statusFilter === 'ALL' || 
                           (statusFilter === '0' && inc.status === 0) || 
-                          (statusFilter === '1' && inc.status === 1);
+                          (statusFilter === '1' && inc.status >= 1);
 
     const matchesType = typeFilter === 'ALL' || inc.type === typeFilter;
 
@@ -283,9 +284,9 @@ export default function AlertsAndIncidents() {
               <div style={styles.cardHeader}>
                 <div style={{
                   ...styles.severityBadge,
-                  ...(incident.severity === 'ALTA' ? styles.badgeHigh : {}),
-                  ...(incident.severity === 'MEDIA' ? styles.badgeMedium : {}),
-                  ...(incident.severity === 'BAJA' ? styles.badgeLow : {})
+                  ...(incident.severity?.toUpperCase() === 'ALTA' ? styles.badgeHigh : {}),
+                  ...(incident.severity?.toUpperCase() === 'MEDIA' ? styles.badgeMedium : {}),
+                  ...(incident.severity?.toUpperCase() === 'BAJA' ? styles.badgeLow : {})
                 }}>
                   {incident.severity}
                 </div>
@@ -301,9 +302,9 @@ export default function AlertsAndIncidents() {
 
                 <div style={{
                   ...styles.statusBadge,
-                  ...(incident.status === 1 ? styles.statusBadgeResolved : styles.statusBadgeActive)
+                  ...(incident.status >= 1 ? styles.statusBadgeResolved : styles.statusBadgeActive)
                 }}>
-                  {incident.status === 1 ? 'Resuelto' : 'Activo'}
+                  {incident.status === 3 ? 'Descartado' : incident.status >= 1 ? 'Resuelto' : 'Activo'}
                 </div>
               </div>
 
@@ -312,7 +313,7 @@ export default function AlertsAndIncidents() {
                 <h4 style={styles.incidentTitle}>{incident.title}</h4>
                 <p style={styles.incidentDesc}>{incident.description}</p>
                 <span style={styles.incidentDate}>
-                  Reportado: {new Date(incident.clientTimestamp).toLocaleString()}
+                  Reportado: {(incident.clientTimestamp || incident.createdAt) ? new Date((incident.clientTimestamp || incident.createdAt)!).toLocaleString('es-CL') : 'Reciente'}
                 </span>
               </div>
 
@@ -418,15 +419,15 @@ export default function AlertsAndIncidents() {
             <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
               <span style={{
                 ...styles.severityBadge,
-                ...(detailIncident.severity === 'ALTA' ? styles.badgeHigh : {}),
-                ...(detailIncident.severity === 'MEDIA' ? styles.badgeMedium : {}),
-                ...(detailIncident.severity === 'BAJA' ? styles.badgeLow : {})
+                ...(detailIncident.severity?.toUpperCase() === 'ALTA' ? styles.badgeHigh : {}),
+                ...(detailIncident.severity?.toUpperCase() === 'MEDIA' ? styles.badgeMedium : {}),
+                ...(detailIncident.severity?.toUpperCase() === 'BAJA' ? styles.badgeLow : {})
               }}>{detailIncident.severity}</span>
               <span style={styles.typeBadge}>{detailIncident.type || 'Novedad'}</span>
               <span style={{
                 ...styles.statusBadge,
-                ...(detailIncident.status === 1 ? styles.statusBadgeResolved : styles.statusBadgeActive)
-              }}>{detailIncident.status === 1 ? 'Resuelto' : 'Activo'}</span>
+                ...(detailIncident.status >= 1 ? styles.statusBadgeResolved : styles.statusBadgeActive)
+              }}>{detailIncident.status === 3 ? 'Descartado' : detailIncident.status >= 1 ? 'Resuelto' : 'Activo'}</span>
             </div>
 
             {/* Título y Descripción */}
@@ -437,7 +438,7 @@ export default function AlertsAndIncidents() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '13px' }}>
                 <Clock size={14} />
-                <span>Reportado: {new Date(detailIncident.clientTimestamp).toLocaleString('es-CL')}</span>
+                <span>Reportado: {(detailIncident.clientTimestamp || detailIncident.createdAt) ? new Date((detailIncident.clientTimestamp || detailIncident.createdAt)!).toLocaleString('es-CL') : 'Reciente'}</span>
               </div>
               {detailIncident.managedByName && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '13px' }}>

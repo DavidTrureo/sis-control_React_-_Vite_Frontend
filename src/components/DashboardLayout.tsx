@@ -500,8 +500,8 @@ export default function DashboardLayout({ children, activeTab, onTabChange, titl
                             <span style={{ color: '#fff', fontWeight: '600', fontSize: '13px' }}>{alert.title}</span>
                             <span style={{
                               fontSize: '10px', fontWeight: '700', padding: '2px 6px', borderRadius: '4px',
-                              backgroundColor: alert.severity === 'ALTA' ? 'rgba(239,68,68,0.15)' : 'rgba(234,179,8,0.15)',
-                              color: alert.severity === 'ALTA' ? '#ef4444' : '#eab308',
+                              backgroundColor: alert.severity?.toUpperCase() === 'ALTA' ? 'rgba(239,68,68,0.15)' : 'rgba(234,179,8,0.15)',
+                              color: alert.severity?.toUpperCase() === 'ALTA' ? '#ef4444' : '#eab308',
                             }}>{alert.severity}</span>
                           </div>
                           <span style={{ color: '#64748b', fontSize: '12px' }}>

@@ -292,13 +292,16 @@ export default function RealTimeMonitor() {
               (i.title.toUpperCase().includes('PÁNICO') || i.title.toUpperCase().includes('SOS'))
             ) || false;
 
+            const totalCp = summary.checkpointsTotal ?? summary.totalCheckpoints ?? 0;
+            const execCp = summary.checkpointsExecuted ?? 0;
+
             return {
               id: rondaObj.id,
               guardName: rondaObj.worker?.fullName || 'Guardia de Seguridad',
               installationName: rondaObj.installation?.name || 'Sede Operativa',
-              escaneados: summary.checkpointsExecuted,
-              totalCheckpoints: summary.totalCheckpoints,
-              percent: summary.totalCheckpoints > 0 ? Math.round((summary.checkpointsExecuted / summary.totalCheckpoints) * 100) : 0,
+              escaneados: execCp,
+              totalCheckpoints: totalCp,
+              percent: totalCp > 0 ? Math.round((execCp / totalCp) * 100) : 0,
               latitude: lat,
               longitude: lng,
               startTime: summary.startTime ? summary.startTime.substring(0, 5) : '00:00',
