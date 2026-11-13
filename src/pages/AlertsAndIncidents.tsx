@@ -78,10 +78,13 @@ export default function AlertsAndIncidents() {
 
     const interval = setInterval(checkPulse, 8000);
     const onVisible = () => { if (!document.hidden) checkPulse(); };
+    const onAlertsUpdated = () => { fetchIncidents(); };
     document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('sis:alerts-updated', onAlertsUpdated);
     return () => {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('sis:alerts-updated', onAlertsUpdated);
     };
   }, []);
 
@@ -120,7 +123,7 @@ export default function AlertsAndIncidents() {
         managedBy: user?.userId || 1,
       });
 
-      // Actualizar la lista local
+      // Actualizar la lista local y sincronizar contador de la campana
       setIncidents(prev => 
         prev.map(item => 
           item.id === selectedIncident.id 
@@ -128,6 +131,7 @@ export default function AlertsAndIncidents() {
             : item
         )
       );
+      window.dispatchEvent(new Event('sis:alerts-updated'));
       toast.success('Alerta e incidente resuelto satisfactoriamente');
       setShowResolveModal(false);
       setSelectedIncident(null);
@@ -316,7 +320,20 @@ export default function AlertsAndIncidents() {
         </div>
       ) : (
         <div style={styles.incidentsGrid}>
-          {filteredIncidents.map((incident) => (
+          {filteredIncidents.map((incident) => {
+            const isAdminCancel = incident.description?.includes('[CANCELACIÓN ADMINISTRATIVA]') || incident.title?.toLowerCase().includes('cancelada administrativamente');
+            const isAutoClose = incident.description?.includes('[CIERRE AUTOMÁTICO]');
+            const isSystemEvent = isAdminCancel || isAutoClose || incident.type === 'JORNADA' || incident.type === 'RONDA';
+            const cleanReason = (incident.description || '')
+              .replace('[CANCELACIÓN ADMINISTRATIVA]:', '')
+              .replace('[CANCELACIÓN ADMINISTRATIVA]', '')
+              .replace('[CIERRE AUTOMÁTICO]:', '')
+              .replace('[CIERRE AUTOMÁTICO]', '')
+              .trim();
+            const displayTitle = isAdminCancel ? 'Ronda Finalizada por Administración' : incident.title;
+            const displayTypeBadge = isAdminCancel ? 'CIERRE ADMIN' : isAutoClose ? 'CIERRE AUTO' : (incident.type || 'Novedad');
+
+            return (
             <div 
               key={incident.id} 
               className="glass-card" 
@@ -338,9 +355,10 @@ export default function AlertsAndIncidents() {
                   ...styles.typeBadge,
                   ...(incident.type === 'JORNADA' ? styles.badgeJornada : {}),
                   ...(incident.type === 'RONDA' ? styles.badgeRonda : {}),
-                  ...(incident.type === 'MANTENCION' ? styles.badgeMantencion : {})
+                  ...(incident.type === 'MANTENCION' ? styles.badgeMantencion : {}),
+                  ...(isAdminCancel ? { backgroundColor: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', border: '1px solid rgba(245, 158, 11, 0.35)' } : {})
                 }}>
-                  {incident.type || 'Novedad'}
+                  {displayTypeBadge}
                 </div>
 
                 <div style={{
@@ -353,7 +371,7 @@ export default function AlertsAndIncidents() {
 
               {/* Título e Info */}
               <div style={styles.cardBody}>
-                <h4 style={styles.incidentTitle}>{incident.title}</h4>
+                <h4 style={styles.incidentTitle}>{displayTitle}</h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', margin: '4px 0 6px 0', padding: '8px 10px', backgroundColor: 'rgba(255, 255, 255, 0.03)', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: '#e2e8f0', fontWeight: '600' }}>
                     <User size={13} color="#3b82f6" />
@@ -364,32 +382,54 @@ export default function AlertsAndIncidents() {
                     <span>Instalación: {incident.clientName || 'Sin instalación'}{incident.checkpointName && incident.checkpointName !== 'N/A' ? ` • Punto: ${incident.checkpointName}` : ''}</span>
                   </div>
                 </div>
-                <p style={styles.incidentDesc}>{incident.description}</p>
+
+                {isAdminCancel ? (
+                  <div style={{ margin: '4px 0 6px 0', padding: '10px 12px', borderRadius: '8px', backgroundColor: 'rgba(245, 158, 11, 0.08)', borderLeft: '3px solid #f59e0b', borderTop: '1px solid rgba(245, 158, 11, 0.15)', borderRight: '1px solid rgba(245, 158, 11, 0.15)', borderBottom: '1px solid rgba(245, 158, 11, 0.15)' }}>
+                    <div style={{ fontSize: '11px', fontWeight: '700', color: '#fbbf24', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '3px' }}>
+                      🛡️ Disposición Administrativa • Motivo de Cierre
+                    </div>
+                    <div style={{ fontSize: '13.5px', color: '#f1f5f9', fontStyle: 'italic', lineHeight: '1.45' }}>
+                      "{cleanReason || 'Cierre forzado por supervisión'}"
+                    </div>
+                  </div>
+                ) : isAutoClose ? (
+                  <div style={{ margin: '4px 0 6px 0', padding: '10px 12px', borderRadius: '8px', backgroundColor: 'rgba(59, 130, 246, 0.08)', borderLeft: '3px solid #3b82f6' }}>
+                    <div style={{ fontSize: '11px', fontWeight: '700', color: '#60a5fa', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '3px' }}>
+                      ⚙️ Cierre Automático del Sistema
+                    </div>
+                    <div style={{ fontSize: '13px', color: '#cbd5e1', lineHeight: '1.45' }}>
+                      {cleanReason}
+                    </div>
+                  </div>
+                ) : (
+                  <p style={styles.incidentDesc}>{incident.description}</p>
+                )}
+
                 <span style={styles.incidentDate}>
                   Reportado: {(incident.clientTimestamp || incident.createdAt) ? new Date((incident.clientTimestamp || incident.createdAt)!).toLocaleString('es-CL') : 'Reciente'}
                 </span>
               </div>
 
-              {/* Imagen Adjunta */}
+              {/* Imagen Adjunta (solo se muestra placeholder vacío cuando aplica evidencia fotográfica) */}
               {(incident.imageUrl || incident.checklogImageUrl) ? (
                 <div style={styles.imageContainer} onClick={(e) => { e.stopPropagation(); setZoomImage((incident.imageUrl || incident.checklogImageUrl)!); }}>
-                  <img src={incident.imageUrl || incident.checklogImageUrl} alt={incident.title} style={styles.image} />
+                  <img src={incident.imageUrl || incident.checklogImageUrl} alt={displayTitle} style={styles.image} />
                   <div style={styles.imageOverlay}>
                     <Camera size={20} color="#ffffff" />
                     <span>Ver Imagen Ampliada</span>
                   </div>
                 </div>
-              ) : (
+              ) : !isSystemEvent ? (
                 <div style={styles.noImagePlaceholder}>
                   <Camera size={24} color="#334155" />
                   <span>Sin evidencia fotográfica</span>
                 </div>
-              )}
+              ) : null}
 
               {/* Pie de Tarjeta - Acciones */}
               {incident.status === 0 ? (
                 <button 
-                  onClick={() => handleOpenResolveModal(incident)}
+                  onClick={(e) => { e.stopPropagation(); handleOpenResolveModal(incident); }}
                   style={styles.actionBtn}
                 >
                   <CheckCircle size={16} />
@@ -398,11 +438,12 @@ export default function AlertsAndIncidents() {
               ) : (
                 <div style={styles.resolvedInfo}>
                   <Check size={16} color="#10b981" />
-                  <span>Resuelto por: {incident.managedByName || 'Supervisor'}</span>
+                  <span>{isAdminCancel ? `Ejecutado por: ${incident.managedByName || 'Administración'}` : `Resuelto por: ${incident.managedByName || 'Supervisor'}`}</span>
                 </div>
               )}
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -487,8 +528,32 @@ export default function AlertsAndIncidents() {
             </div>
 
             {/* Título y Descripción */}
-            <h4 style={{ color: '#fff', fontWeight: '700', fontSize: '18px', marginBottom: '8px' }}>{detailIncident.title}</h4>
-            <p style={{ color: '#94a3b8', fontSize: '14px', lineHeight: '1.6', marginBottom: '20px' }}>{detailIncident.description}</p>
+            <h4 style={{ color: '#fff', fontWeight: '700', fontSize: '18px', marginBottom: '8px' }}>
+              {detailIncident.description?.includes('[CANCELACIÓN ADMINISTRATIVA]') || detailIncident.title?.toLowerCase().includes('cancelada administrativamente')
+                ? 'Ronda Finalizada por Administración'
+                : detailIncident.title}
+            </h4>
+            {detailIncident.description?.includes('[CANCELACIÓN ADMINISTRATIVA]') ? (
+              <div style={{ marginBottom: '20px', padding: '12px 14px', borderRadius: '10px', backgroundColor: 'rgba(245, 158, 11, 0.08)', borderLeft: '4px solid #f59e0b' }}>
+                <div style={{ fontSize: '11.5px', fontWeight: '700', color: '#fbbf24', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '4px' }}>
+                  🛡️ Disposición Administrativa • Motivo de Cierre
+                </div>
+                <div style={{ fontSize: '14px', color: '#f1f5f9', fontStyle: 'italic' }}>
+                  "{detailIncident.description.replace('[CANCELACIÓN ADMINISTRATIVA]:', '').replace('[CANCELACIÓN ADMINISTRATIVA]', '').trim()}"
+                </div>
+              </div>
+            ) : detailIncident.description?.includes('[CIERRE AUTOMÁTICO]') ? (
+              <div style={{ marginBottom: '20px', padding: '12px 14px', borderRadius: '10px', backgroundColor: 'rgba(59, 130, 246, 0.08)', borderLeft: '4px solid #3b82f6' }}>
+                <div style={{ fontSize: '11.5px', fontWeight: '700', color: '#60a5fa', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '4px' }}>
+                  ⚙️ Cierre Automático del Sistema
+                </div>
+                <div style={{ fontSize: '14px', color: '#cbd5e1' }}>
+                  {detailIncident.description.replace('[CIERRE AUTOMÁTICO]:', '').replace('[CIERRE AUTOMÁTICO]', '').trim()}
+                </div>
+              </div>
+            ) : (
+              <p style={{ color: '#94a3b8', fontSize: '14px', lineHeight: '1.6', marginBottom: '20px' }}>{detailIncident.description}</p>
+            )}
 
             {/* Metadata */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px', padding: '12px', backgroundColor: 'rgba(255, 255, 255, 0.03)', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
@@ -532,12 +597,12 @@ export default function AlertsAndIncidents() {
               >
                 <img src={detailIncident.imageUrl || detailIncident.checklogImageUrl} alt="Evidencia" style={{ width: '100%', objectFit: 'cover', borderRadius: '10px' }} />
               </div>
-            ) : (
+            ) : !(detailIncident.description?.includes('[CANCELACIÓN ADMINISTRATIVA]') || detailIncident.description?.includes('[CIERRE AUTOMÁTICO]') || detailIncident.type === 'JORNADA' || detailIncident.type === 'RONDA') ? (
               <div style={{ ...styles.noImagePlaceholder, marginBottom: '20px' }}>
                 <Camera size={24} color="#334155" />
                 <span>Sin evidencia fotográfica</span>
               </div>
-            )}
+            ) : null}
 
             {/* Acciones */}
             <div style={{ display: 'flex', gap: '12px' }}>

@@ -253,44 +253,64 @@ export default function DashboardLayout({ children, activeTab, onTabChange, titl
 
   // === Notification Bell State ===
   const [pendingAlerts, setPendingAlerts] = useState<any[]>([]);
+  const [totalPendingCount, setTotalPendingCount] = useState<number>(0);
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
   const knownMaxAlertIdRef = useRef<number | null>(null);
   const toast = useToast();
 
+  const fetchBellAlerts = async (isInitial = false) => {
+    try {
+      const res = await api.get('/api/incidents');
+      const list = Array.isArray(res.data) ? res.data : [];
+      list.sort((a: any, b: any) => (b.id || 0) - (a.id || 0));
+      const pending = list.filter((inc: any) => inc.status === 0);
+      setTotalPendingCount(pending.length);
+      setPendingAlerts(pending.slice(0, 8));
+
+      const maxId = pending.length > 0 ? (pending[0].id || 0) : 0;
+      if (isInitial || knownMaxAlertIdRef.current === null) {
+        knownMaxAlertIdRef.current = maxId;
+      } else if (maxId > knownMaxAlertIdRef.current) {
+        const newOnes = pending.filter((inc: any) => (inc.id || 0) > (knownMaxAlertIdRef.current || 0));
+        knownMaxAlertIdRef.current = maxId;
+        newOnes.forEach((inc: any) => {
+          const meta = `${inc.username ? `Guardia: ${inc.username}` : ''}${inc.clientName ? ` • ${inc.clientName}` : ''}`;
+          if (inc.severity?.toUpperCase() === 'ALTA' || inc.title?.toUpperCase().includes('PÁNICO')) {
+            toast.error(`🚨 ${inc.title}${meta ? ` (${meta})` : ''}`);
+          } else {
+            toast.warning(`⚠️ ${inc.title}${meta ? ` (${meta})` : ''}`);
+          }
+        });
+      }
+    } catch (e) { /* silent */ }
+  };
+
+  const handleQuickResolveFromBell = async (e: React.MouseEvent, alertId: number) => {
+    e.stopPropagation();
+    try {
+      await api.put(`/api/incidents/${alertId}/status`, {
+        status: 2,
+        managedBy: user?.userId || user?.id || 1,
+      });
+      setPendingAlerts(prev => prev.filter(a => a.id !== alertId));
+      setTotalPendingCount(prev => Math.max(0, prev - 1));
+      window.dispatchEvent(new Event('sis:alerts-updated'));
+      toast.success('Alerta marcada como resuelta');
+      fetchBellAlerts(false);
+    } catch (err) {
+      toast.error('No se pudo resolver la alerta');
+    }
+  };
+
   useEffect(() => {
     let lastVersion = 0;
-    const fetchAlerts = async (isInitial = false) => {
-      try {
-        const res = await api.get('/api/incidents');
-        const list = Array.isArray(res.data) ? res.data : [];
-        list.sort((a: any, b: any) => (b.id || 0) - (a.id || 0));
-        const pending = list.filter((inc: any) => inc.status === 0);
-        setPendingAlerts(pending.slice(0, 8));
-
-        const maxId = pending.length > 0 ? (pending[0].id || 0) : 0;
-        if (isInitial || knownMaxAlertIdRef.current === null) {
-          knownMaxAlertIdRef.current = maxId;
-        } else if (maxId > knownMaxAlertIdRef.current) {
-          const newOnes = pending.filter((inc: any) => (inc.id || 0) > (knownMaxAlertIdRef.current || 0));
-          knownMaxAlertIdRef.current = maxId;
-          newOnes.forEach((inc: any) => {
-            const meta = `${inc.username ? `Guardia: ${inc.username}` : ''}${inc.clientName ? ` • ${inc.clientName}` : ''}`;
-            if (inc.severity?.toUpperCase() === 'ALTA' || inc.title?.toUpperCase().includes('PÁNICO')) {
-              toast.error(`🚨 ${inc.title}${meta ? ` (${meta})` : ''}`);
-            } else {
-              toast.warning(`⚠️ ${inc.title}${meta ? ` (${meta})` : ''}`);
-            }
-          });
-        }
-      } catch (e) { /* silent */ }
-    };
     const init = async () => {
       try {
         const p = await api.get('/api/reportes/pulse');
         if (p.data?.version) lastVersion = p.data.version;
       } catch (e) {}
-      await fetchAlerts(true);
+      await fetchBellAlerts(true);
     };
     init();
 
@@ -300,19 +320,26 @@ export default function DashboardLayout({ children, activeTab, onTabChange, titl
         const p = await api.get('/api/reportes/pulse');
         if (p.data?.version && p.data.version !== lastVersion) {
           lastVersion = p.data.version;
-          await fetchAlerts(false);
+          await fetchBellAlerts(false);
         }
       } catch (e) {}
     };
 
-    const interval = setInterval(checkPulse, 8000);
+    const interval = setInterval(checkPulse, 5000);
     const onVisible = () => { if (!document.hidden) checkPulse(); };
+    const onAlertsUpdated = () => { fetchBellAlerts(false); };
     document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('sis:alerts-updated', onAlertsUpdated);
     return () => {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('sis:alerts-updated', onAlertsUpdated);
     };
   }, []);
+
+  useEffect(() => {
+    fetchBellAlerts(false);
+  }, [activeTab]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -498,14 +525,22 @@ export default function DashboardLayout({ children, activeTab, onTabChange, titl
             <div ref={notifRef} style={{ position: 'relative' }}>
               <button 
                 style={styles.notificationBtn} 
-                onClick={() => setShowNotifDropdown(!showNotifDropdown)}
+                onClick={() => {
+                  const nextOpen = !showNotifDropdown;
+                  setShowNotifDropdown(nextOpen);
+                  if (nextOpen) fetchBellAlerts(false);
+                }}
                 title="Notificaciones"
               >
                 <Bell size={20} color="#94a3b8" />
-                {pendingAlerts.length > 0 && (
-                  <div style={styles.notificationDot}>
+                {totalPendingCount > 0 && (
+                  <div style={{
+                    ...styles.notificationDot,
+                    minWidth: totalPendingCount > 9 ? '18px' : '16px',
+                    padding: totalPendingCount > 9 ? '0 4px' : '0',
+                  }}>
                     <span style={{ fontSize: '9px', fontWeight: '800', color: '#fff', lineHeight: '1' }}>
-                      {pendingAlerts.length > 9 ? '9+' : pendingAlerts.length}
+                      {totalPendingCount > 99 ? '99+' : totalPendingCount}
                     </span>
                   </div>
                 )}
@@ -513,18 +548,18 @@ export default function DashboardLayout({ children, activeTab, onTabChange, titl
 
               {showNotifDropdown && (
                 <div style={{
-                  position: 'absolute', top: '42px', right: 0, width: '360px',
+                  position: 'absolute', top: '42px', right: 0, width: '380px',
                   backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.1)',
                   borderRadius: '12px', boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
                   zIndex: 1000, overflow: 'hidden',
                 }}>
                   <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: '#fff', fontWeight: '700', fontSize: '14px' }}>Alertas Pendientes ({pendingAlerts.length})</span>
+                    <span style={{ color: '#fff', fontWeight: '700', fontSize: '14px' }}>Alertas Pendientes ({totalPendingCount})</span>
                     <button onClick={() => setShowNotifDropdown(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                       <X size={16} color="#64748b" />
                     </button>
                   </div>
-                  <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
+                  <div style={{ maxHeight: '340px', overflowY: 'auto' }}>
                     {pendingAlerts.length === 0 ? (
                       <div style={{ padding: '24px', textAlign: 'center', color: '#64748b', fontSize: '13px' }}>Sin alertas pendientes</div>
                     ) : (
@@ -533,36 +568,54 @@ export default function DashboardLayout({ children, activeTab, onTabChange, titl
                           key={alert.id} 
                           onClick={() => { onTabChange('incidents'); setShowNotifDropdown(false); }}
                           style={{
-                            padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.03)',
+                            padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.04)',
                             cursor: 'pointer', transition: 'background 0.15s',
                           }}
                           onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.04)')}
                           onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                         >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                            <span style={{ color: '#fff', fontWeight: '600', fontSize: '13px' }}>{alert.title}</span>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', gap: '8px' }}>
+                            <span style={{ color: '#fff', fontWeight: '600', fontSize: '13px', flex: 1 }}>{alert.title}</span>
                             <span style={{
                               fontSize: '10px', fontWeight: '700', padding: '2px 6px', borderRadius: '4px',
                               backgroundColor: alert.severity?.toUpperCase() === 'ALTA' ? 'rgba(239,68,68,0.15)' : 'rgba(234,179,8,0.15)',
                               color: alert.severity?.toUpperCase() === 'ALTA' ? '#ef4444' : '#eab308',
                             }}>{alert.severity}</span>
                           </div>
-                          <div style={{ color: '#cbd5e1', fontSize: '11.5px', fontWeight: '500', marginBottom: '3px' }}>
+                          <div style={{ color: '#cbd5e1', fontSize: '11.5px', fontWeight: '500', marginBottom: '6px' }}>
                             👮 {alert.username || 'Guardia'} &bull; 📍 {alert.clientName || 'Sin sede'}
                           </div>
-                          <span style={{ color: '#64748b', fontSize: '11.5px' }}>
-                            {(alert.clientTimestamp || alert.createdAt) ? new Date(alert.clientTimestamp || alert.createdAt).toLocaleString('es-CL', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' }) : ''}
-                          </span>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ color: '#64748b', fontSize: '11.5px' }}>
+                              {(alert.clientTimestamp || alert.createdAt) ? new Date(alert.clientTimestamp || alert.createdAt).toLocaleString('es-CL', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' }) : ''}
+                            </span>
+                            <button
+                              onClick={(e) => handleQuickResolveFromBell(e, alert.id)}
+                              style={{
+                                backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                                color: '#34d399',
+                                border: '1px solid rgba(16, 185, 129, 0.3)',
+                                borderRadius: '6px',
+                                padding: '2px 8px',
+                                fontSize: '11px',
+                                fontWeight: '700',
+                                cursor: 'pointer',
+                              }}
+                              title="Marcar como resuelta"
+                            >
+                              ✓ Resolver
+                            </button>
+                          </div>
                         </div>
                       ))
                     )}
                   </div>
-                  {pendingAlerts.length > 0 && (
+                  {totalPendingCount > 0 && (
                     <div 
                       onClick={() => { onTabChange('incidents'); setShowNotifDropdown(false); }}
                       style={{ padding: '12px', textAlign: 'center', borderTop: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer', color: '#3b82f6', fontWeight: '600', fontSize: '13px' }}
                     >
-                      Ver Todas las Alertas →
+                      Ver Todas las Alertas ({totalPendingCount}) →
                     </div>
                   )}
                 </div>

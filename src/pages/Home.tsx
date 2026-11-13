@@ -226,11 +226,19 @@ export default function Home({ onNavigate }: HomeProps) {
       const sevUpper = inc.severity?.toUpperCase();
       const guardLabel = inc.username ? ` — ${inc.username}` : '';
       const instLabel = inc.clientName ? `📍 ${inc.clientName} • ` : '';
+      const isAdminCancel = inc.description?.includes('[CANCELACIÓN ADMINISTRATIVA]') || inc.title?.toLowerCase().includes('cancelada administrativamente');
+      const cleanDesc = (inc.description || '')
+        .replace('[CANCELACIÓN ADMINISTRATIVA]:', 'Motivo de cierre:')
+        .replace('[CANCELACIÓN ADMINISTRATIVA]', 'Motivo de cierre:')
+        .replace('[CIERRE AUTOMÁTICO]:', 'Cierre automático:')
+        .replace('[CIERRE AUTOMÁTICO]', 'Cierre automático:')
+        .trim();
+      const cleanTitle = isAdminCancel ? 'Ronda Finalizada por Administración' : inc.title;
       events.push({
         id: `inc-${inc.id}`,
         type: 'incident',
-        title: `${inc.title}${guardLabel}`,
-        description: `${instLabel}${inc.description || ''} — Severidad: ${inc.severity}`,
+        title: `${cleanTitle}${guardLabel}`,
+        description: `${instLabel}${cleanDesc} — Severidad: ${inc.severity}`,
         time: (inc.clientTimestamp || inc.createdAt) ? new Date(inc.clientTimestamp || inc.createdAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) : '',
         rawTime: inc.clientTimestamp || inc.createdAt,
         status: inc.severity,
