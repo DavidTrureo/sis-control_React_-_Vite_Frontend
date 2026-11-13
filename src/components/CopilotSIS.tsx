@@ -74,7 +74,7 @@ export default function CopilotSIS() {
         {
           id: Math.random().toString(36).substring(2, 9),
           sender: 'ai',
-          text: '⚠️ **Modo Desconectado:** No se pudo establecer conexión directa con el endpoint de IA en el servidor backend. Asegúrate de que el Backend de SIS-Control esté en ejecución en el puerto 8080 y cuente con la clave `GEMINI_API_KEY` activa.',
+          text: '⚠️ **Modo Desconectado:** No se pudo establecer conexión con el módulo de Inteligencia Artificial o se alcanzó el límite preventivo de consultas por minuto. Intenta nuevamente en unos segundos.',
           timestamp: new Date(),
         },
       ]);
