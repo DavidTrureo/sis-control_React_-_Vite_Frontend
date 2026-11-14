@@ -9,6 +9,7 @@ interface User {
   rut: string;
   username: string;
   email: string;
+  phoneNumber?: string;
   role: 'ADMIN' | 'SUPERVISOR' | 'GUARD';
   status: number; // 1 = Activo, 0 = Inactivo
 }
@@ -44,6 +45,7 @@ export default function UserManagement() {
   const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<'ADMIN' | 'SUPERVISOR' | 'GUARD'>('GUARD');
   const [rut, setRut] = useState('');
@@ -75,6 +77,7 @@ export default function UserManagement() {
     setFullName('');
     setUsername('');
     setEmail('');
+    setPhoneNumber('');
     setPassword('');
     setRut('');
     setRole('GUARD');
@@ -89,6 +92,7 @@ export default function UserManagement() {
     setFullName(user.fullName);
     setUsername(user.username);
     setEmail(user.email);
+    setPhoneNumber(user.phoneNumber || '');
     setPassword(''); // La contraseña se deja vacía al editar a menos que se desee cambiar
     setRut(user.rut || '');
     setRole(user.role);
@@ -116,6 +120,7 @@ export default function UserManagement() {
           rut,
           username,
           email,
+          ...(phoneNumber.trim() ? { phoneNumber: phoneNumber.trim() } : {}),
           password,
           role,
         });
@@ -123,6 +128,7 @@ export default function UserManagement() {
         if (res.data) {
           setUsers(prev => [...prev, res.data]);
           setShowModal(false);
+          toast.success('Usuario registrado exitosamente.');
         }
       } else {
         // PUT /api/usuarios/{id}?editorId={editorId}
@@ -131,6 +137,7 @@ export default function UserManagement() {
           rut,
           username,
           email,
+          ...(phoneNumber.trim() ? { phoneNumber: phoneNumber.trim() } : {}),
           ...(password ? { password } : {}), // Solo enviar si se ingresó
           role,
         });
@@ -138,12 +145,14 @@ export default function UserManagement() {
         if (res.data) {
           setUsers(prev => prev.map(u => u.id === editingUserId ? res.data : u));
           setShowModal(false);
+          toast.success('Datos del usuario actualizados correctamente.');
         }
       }
     } catch (err: any) {
       console.error('Error saving user:', err);
-      if (err.response && err.response.data && err.response.data.error) {
-        setFormError(err.response.data.error);
+      const backendMessage = err.response?.data?.message || err.response?.data?.error;
+      if (backendMessage) {
+        setFormError(backendMessage);
       } else {
         setFormError('Error al guardar el usuario. Verifica los datos.');
       }
@@ -378,11 +387,22 @@ export default function UserManagement() {
                     required
                   />
                 </div>
+
+                <div style={styles.inputGroup}>
+                  <label style={styles.label}>Teléfono (Opcional)</label>
+                  <input
+                    type="tel"
+                    placeholder="ej. +56912345678"
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    className="input-premium"
+                  />
+                </div>
               </div>
 
               <div style={styles.grid2}>
                 <div style={styles.inputGroup}>
-                  <label style={styles.label}>Contraseña {modalMode === 'edit' && '(dejar vacío para no cambiar)'}</label>
+                  <label style={styles.label}>Contraseña {modalMode === 'edit' ? '(dejar vacío para no cambiar)' : '(mín. 8 caract., letras y números)'}</label>
                   <input
                     type="password"
                     placeholder="••••••••"
