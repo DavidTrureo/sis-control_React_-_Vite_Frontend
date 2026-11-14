@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import { api, TokenService } from '../services/api';
-import { Shield, MapPin, Navigation, Clock, User, Building2, CheckCircle2, Loader2 } from 'lucide-react';
+import { Shield, MapPin, Navigation, Clock, User, Building2, CheckCircle2, Loader2, BellRing } from 'lucide-react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -253,6 +253,7 @@ export default function RealTimeMonitor() {
   const [focusTrigger, setFocusTrigger] = useState<number>(0);
   const [focusedGuardName, setFocusedGuardName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [pingSentGuards, setPingSentGuards] = useState<Record<string, boolean>>({});
   const isInitialLoadRef = useRef(true);
   const lastPulseRef = useRef<number>(0);
   const markerRefs = useRef<Record<string, any>>({});
@@ -485,6 +486,24 @@ export default function RealTimeMonitor() {
     setMapCenter([targetLat, targetLng]);
     setMapZoom(17);
     setFocusTrigger(prev => prev + 1);
+  };
+
+  const handleRequestPresenceCheck = async (guardName: string, shiftId?: number) => {
+    if (pingSentGuards[guardName]) return;
+    try {
+      setPingSentGuards(prev => ({ ...prev, [guardName]: true }));
+      await api.post('/api/rondas/presencia/solicitar', {
+        shiftId: shiftId || null,
+        guardName,
+        adminId: currentUserId,
+      });
+      setTimeout(() => {
+        setPingSentGuards(prev => ({ ...prev, [guardName]: false }));
+      }, 62000);
+    } catch (err) {
+      console.error('Error solicitando control de presencia:', err);
+      setPingSentGuards(prev => ({ ...prev, [guardName]: false }));
+    }
   };
 
   return (
@@ -727,13 +746,30 @@ export default function RealTimeMonitor() {
                         </div>
                       </div>
 
-                      <button 
-                        onClick={() => handleCenterMarker(round.latitude, round.longitude, round.guardName)}
-                        style={round.hasSos ? styles.centerBtnActiveSos : styles.centerBtn}
-                      >
-                        <Navigation size={13} />
-                        <span>Centrar en Mapa</span>
-                      </button>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button 
+                          onClick={() => handleCenterMarker(round.latitude, round.longitude, round.guardName)}
+                          style={{ ...(round.hasSos ? styles.centerBtnActiveSos : styles.centerBtn), flex: 1 }}
+                        >
+                          <Navigation size={13} />
+                          <span>Centrar</span>
+                        </button>
+                        <button
+                          onClick={() => handleRequestPresenceCheck(round.guardName)}
+                          disabled={!!pingSentGuards[round.guardName]}
+                          style={{
+                            ...styles.centerBtn,
+                            flex: 1,
+                            color: pingSentGuards[round.guardName] ? '#94a3b8' : '#f59e0b',
+                            borderColor: pingSentGuards[round.guardName] ? 'rgba(255,255,255,0.06)' : 'rgba(245, 158, 11, 0.35)',
+                            backgroundColor: pingSentGuards[round.guardName] ? 'rgba(255,255,255,0.02)' : 'rgba(245, 158, 11, 0.08)',
+                          }}
+                          title="Solicita al guardia confirmar en 60s que tiene el teléfono en mano"
+                        >
+                          <BellRing size={13} />
+                          <span>{pingSentGuards[round.guardName] ? 'Esperando (60s)...' : 'Verificar Presencia'}</span>
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -788,15 +824,32 @@ export default function RealTimeMonitor() {
                             Guardia con jornada iniciada. Disponible y a la espera de patrullar.
                           </div>
 
-                          {(shift.latitude && shift.longitude && Number(shift.latitude) !== 0) && (
-                            <button 
-                              onClick={() => handleCenterMarker(Number(shift.latitude), Number(shift.longitude), shift.guardName)}
-                              style={styles.centerBtn}
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            {(shift.latitude && shift.longitude && Number(shift.latitude) !== 0) && (
+                              <button 
+                                onClick={() => handleCenterMarker(Number(shift.latitude), Number(shift.longitude), shift.guardName)}
+                                style={{ ...styles.centerBtn, flex: 1 }}
+                              >
+                                <Navigation size={13} />
+                                <span>Centrar</span>
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleRequestPresenceCheck(shift.guardName, shift.id)}
+                              disabled={!!pingSentGuards[shift.guardName]}
+                              style={{
+                                ...styles.centerBtn,
+                                flex: 1,
+                                color: pingSentGuards[shift.guardName] ? '#94a3b8' : '#f59e0b',
+                                borderColor: pingSentGuards[shift.guardName] ? 'rgba(255,255,255,0.06)' : 'rgba(245, 158, 11, 0.35)',
+                                backgroundColor: pingSentGuards[shift.guardName] ? 'rgba(255,255,255,0.02)' : 'rgba(245, 158, 11, 0.08)',
+                              }}
+                              title="Solicita al guardia confirmar en 60s que tiene el teléfono en mano"
                             >
-                              <Navigation size={13} />
-                              <span>Centrar en Mapa</span>
+                              <BellRing size={13} />
+                              <span>{pingSentGuards[shift.guardName] ? 'Esperando (60s)...' : 'Verificar Presencia'}</span>
                             </button>
-                          )}
+                          </div>
                         </div>
                       );
                     })}
