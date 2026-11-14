@@ -292,9 +292,11 @@ export default function InstallationsManagement() {
 
       setShowInstModal(false);
       await fetchInstallations();
+      toast.success(instModalMode === 'create' ? 'Instalación creada exitosamente.' : 'Instalación actualizada correctamente.');
     } catch (err: any) {
       console.error('Error saving installation:', err);
-      setInstError('Error al guardar. Verifica la conexión con el servidor.');
+      const backendMsg = err.response?.data?.message || err.response?.data?.error;
+      setInstError(backendMsg || 'Error al guardar. Verifica la conexión con el servidor.');
     } finally {
       setFormLoading(false);
     }
@@ -320,7 +322,8 @@ export default function InstallationsManagement() {
     if (!selectedInst) return;
     setCheckModalMode('create');
     setCheckName('');
-    setCheckOrder((checkpoints.length + 1).toString());
+    const maxOrder = checkpoints.reduce((max, c) => (c.status === 1 && c.executionOrder > max ? c.executionOrder : max), 0);
+    setCheckOrder((maxOrder + 1).toString());
     setCheckNfcCode('');
     setCheckLocDesc('');
     setCheckInstruction('');
@@ -359,9 +362,9 @@ export default function InstallationsManagement() {
       setCheckError('');
       
       const body = {
-        name: checkName,
+        name: checkName.trim(),
         executionOrder: Number(checkOrder) || 1,
-        nfcTagCode: checkNfcCode,
+        nfcTagCode: checkNfcCode.trim(),
         locationDescription: checkLocDesc || null,
         instruction: checkInstruction || null,
         status: checkStatus,
@@ -379,9 +382,11 @@ export default function InstallationsManagement() {
 
       setShowCheckModal(false);
       await fetchCheckpoints(selectedInst.id);
+      toast.success(checkModalMode === 'create' ? 'Punto de control registrado correctamente.' : 'Punto de control actualizado correctamente.');
     } catch (err: any) {
       console.error('Error saving checkpoint:', err);
-      setCheckError('Error al guardar. Asegúrate que el código NFC no esté duplicado.');
+      const backendMsg = err.response?.data?.message || err.response?.data?.error;
+      setCheckError(backendMsg || 'Error al guardar. Asegúrate que el código NFC no esté duplicado.');
     } finally {
       setFormLoading(false);
     }
