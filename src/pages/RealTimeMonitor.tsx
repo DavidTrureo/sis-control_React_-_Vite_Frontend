@@ -67,20 +67,20 @@ const createInstallationIcon = (name: string) => L.divIcon({
 });
 
 // 2. Icono para Guardia en Servicio Normal (Verde Activo con Pulso sutil)
-const createGuardIcon = (name: string) => L.divIcon({
+const createGuardIcon = (name: string, isFocused = false) => L.divIcon({
   className: 'custom-leaflet-icon',
   html: `
     <div style="
       position: relative;
-      width: 34px;
-      height: 34px;
+      width: ${isFocused ? '40px' : '34px'};
+      height: ${isFocused ? '40px' : '34px'};
       background-color: #0f172a;
-      border: 2.5px solid #10b981;
+      border: ${isFocused ? '3px solid #ffffff' : '2.5px solid #10b981'};
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 0 12px rgba(16, 185, 129, 0.5);
+      box-shadow: ${isFocused ? '0 0 22px rgba(16, 185, 129, 0.95), 0 0 0 3px #10b981' : '0 0 12px rgba(16, 185, 129, 0.5)'};
     ">
       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
         <path d="M20 13c0 5-3.5 7.5-7.66 9.7a1 1 0 0 1-.68 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 .76-.97l8-2a1 1 0 0 1 .48 0l8 2A1 1 0 0 1 20 6Z"/>
@@ -97,41 +97,43 @@ const createGuardIcon = (name: string) => L.divIcon({
       "></div>
       <div style="
         position: absolute;
-        bottom: -22px;
+        bottom: -24px;
         left: 50%;
         transform: translateX(-50%);
-        background-color: rgba(16, 185, 129, 0.95);
+        background-color: ${isFocused ? '#059669' : 'rgba(16, 185, 129, 0.95)'};
+        border: ${isFocused ? '1.5px solid #ffffff' : 'none'};
         color: #ffffff;
         font-family: inherit;
-        font-size: 10px;
-        font-weight: 700;
-        padding: 2px 6px;
+        font-size: ${isFocused ? '11px' : '10px'};
+        font-weight: 800;
+        padding: 2px 7px;
         border-radius: 4px;
         white-space: nowrap;
         pointer-events: none;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
       ">${name}</div>
     </div>
   `,
-  iconSize: [34, 34],
-  iconAnchor: [17, 17],
-  popupAnchor: [0, -17],
+  iconSize: isFocused ? [40, 40] : [34, 34],
+  iconAnchor: isFocused ? [20, 20] : [17, 17],
+  popupAnchor: [0, -20],
 });
 
 // 4. Icono para Guardia con Jornada Iniciada en Espera (Naranja/Ámbar con Pulso lento)
-const createIdleGuardIcon = (name: string) => L.divIcon({
+const createIdleGuardIcon = (name: string, isFocused = false) => L.divIcon({
   className: 'custom-leaflet-icon',
   html: `
     <div style="
       position: relative;
-      width: 34px;
-      height: 34px;
+      width: ${isFocused ? '40px' : '34px'};
+      height: ${isFocused ? '40px' : '34px'};
       background-color: #0f172a;
-      border: 2.5px solid #d97706;
+      border: ${isFocused ? '3px solid #ffffff' : '2.5px solid #d97706'};
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 0 12px rgba(217, 119, 6, 0.5);
+      box-shadow: ${isFocused ? '0 0 22px rgba(217, 119, 6, 0.95), 0 0 0 3px #d97706' : '0 0 12px rgba(217, 119, 6, 0.5)'};
     ">
       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
         <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
@@ -149,36 +151,38 @@ const createIdleGuardIcon = (name: string) => L.divIcon({
       "></div>
       <div style="
         position: absolute;
-        bottom: -22px;
+        bottom: -24px;
         left: 50%;
         transform: translateX(-50%);
-        background-color: rgba(217, 119, 6, 0.95);
+        background-color: ${isFocused ? '#b45309' : 'rgba(217, 119, 6, 0.95)'};
+        border: ${isFocused ? '1.5px solid #ffffff' : 'none'};
         color: #ffffff;
         font-family: inherit;
-        font-size: 10px;
-        font-weight: 700;
-        padding: 2px 6px;
+        font-size: ${isFocused ? '11px' : '10px'};
+        font-weight: 800;
+        padding: 2px 7px;
         border-radius: 4px;
         white-space: nowrap;
         pointer-events: none;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
       ">${name}</div>
     </div>
   `,
-  iconSize: [34, 34],
-  iconAnchor: [17, 17],
-  popupAnchor: [0, -17],
+  iconSize: isFocused ? [40, 40] : [34, 34],
+  iconAnchor: isFocused ? [20, 20] : [17, 17],
+  popupAnchor: [0, -20],
 });
 
 // 3. Icono para Alerta de Pánico SOS (Rojo con Pulso de Emergencia Grande)
-const createSosIcon = (name: string) => L.divIcon({
+const createSosIcon = (name: string, isFocused = false) => L.divIcon({
   className: 'custom-leaflet-icon',
   html: `
     <div style="
       position: relative;
-      width: 38px;
-      height: 38px;
+      width: ${isFocused ? '42px' : '38px'};
+      height: ${isFocused ? '42px' : '38px'};
       background-color: #7f1d1d;
-      border: 3px solid #ef4444;
+      border: ${isFocused ? '3px solid #ffffff' : '3px solid #ef4444'};
       border-radius: 50%;
       display: flex;
       align-items: center;
@@ -202,10 +206,11 @@ const createSosIcon = (name: string) => L.divIcon({
       "></div>
       <div style="
         position: absolute;
-        bottom: -22px;
+        bottom: -24px;
         left: 50%;
         transform: translateX(-50%);
         background-color: #ef4444;
+        border: ${isFocused ? '1.5px solid #ffffff' : 'none'};
         color: #ffffff;
         font-family: inherit;
         font-size: 10.5px;
@@ -218,9 +223,9 @@ const createSosIcon = (name: string) => L.divIcon({
       ">⚠️ SOS: ${name}</div>
     </div>
   `,
-  iconSize: [38, 38],
-  iconAnchor: [19, 19],
-  popupAnchor: [0, -19],
+  iconSize: isFocused ? [42, 42] : [38, 38],
+  iconAnchor: isFocused ? [21, 21] : [19, 19],
+  popupAnchor: [0, -21],
 });
 
 export default function RealTimeMonitor() {
@@ -230,9 +235,11 @@ export default function RealTimeMonitor() {
   const [mapCenter, setMapCenter] = useState<[number, number]>([-33.4489, -70.6693]); // Santiago por defecto
   const [mapZoom, setMapZoom] = useState<number>(12);
   const [focusTrigger, setFocusTrigger] = useState<number>(0);
+  const [focusedGuardName, setFocusedGuardName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const isInitialLoadRef = useRef(true);
   const lastPulseRef = useRef<number>(0);
+  const markerRefs = useRef<Record<string, any>>({});
 
   const currentUser = TokenService.getUser();
   const currentUserId = currentUser?.userId || 1;
@@ -380,9 +387,71 @@ export default function RealTimeMonitor() {
     };
   }, []);
 
-  const handleCenterMarker = (lat: number, lng: number) => {
-    setMapCenter([lat, lng]);
-    setMapZoom(16);
+  // Calcular posiciones ligeramente separadas (spider offset) cuando varios guardias están en la misma coordenada/instalación
+  const guardPositions = (() => {
+    const posMap: Record<string, [number, number]> = {};
+    const validShifts = (Array.isArray(activeShifts) ? activeShifts : []).filter(
+      shift => shift && shift.latitude !== null && shift.latitude !== undefined && shift.longitude !== null && shift.longitude !== undefined
+    );
+
+    const rawCoords = validShifts.map((shift) => {
+      const currentRound = activeRounds.find(r => r.guardName === shift.guardName);
+      const lat = currentRound ? Number(currentRound.latitude) : Number(shift.latitude);
+      const lng = currentRound ? Number(currentRound.longitude) : Number(shift.longitude);
+      return { guardName: shift.guardName, shiftId: shift.id, lat, lng };
+    }).filter(item => !isNaN(item.lat) && !isNaN(item.lng) && item.lat !== 0 && item.lng !== 0);
+
+    // Agrupar por cercanía (~10 metros = 0.0001 grados)
+    const groups: { centerLat: number; centerLng: number; items: typeof rawCoords }[] = [];
+    rawCoords.forEach((item) => {
+      const existingGroup = groups.find(
+        g => Math.abs(g.centerLat - item.lat) < 0.00012 && Math.abs(g.centerLng - item.lng) < 0.00012
+      );
+      if (existingGroup) {
+        existingGroup.items.push(item);
+      } else {
+        groups.push({ centerLat: item.lat, centerLng: item.lng, items: [item] });
+      }
+    });
+
+    groups.forEach((group) => {
+      if (group.items.length === 1) {
+        const only = group.items[0];
+        // Desplazar levemente hacia arriba-derecha si coincide exactamente con el icono de la instalación
+        posMap[only.guardName] = [only.lat + 0.00008, only.lng + 0.00008];
+      } else {
+        const radius = 0.00018; // ~18 metros de separación visual
+        group.items.forEach((item, idx) => {
+          const angle = (2 * Math.PI * idx) / group.items.length;
+          posMap[item.guardName] = [
+            group.centerLat + radius * Math.sin(angle),
+            group.centerLng + radius * Math.cos(angle),
+          ];
+        });
+      }
+    });
+
+    return posMap;
+  })();
+
+  const handleCenterMarker = (lat: number, lng: number, guardName?: string) => {
+    let targetLat = lat;
+    let targetLng = lng;
+    if (guardName) {
+      setFocusedGuardName(guardName);
+      if (guardPositions[guardName]) {
+        targetLat = guardPositions[guardName][0];
+        targetLng = guardPositions[guardName][1];
+      }
+      setTimeout(() => {
+        const marker = markerRefs.current[guardName];
+        if (marker && typeof marker.openPopup === 'function') {
+          marker.openPopup();
+        }
+      }, 300);
+    }
+    setMapCenter([targetLat, targetLng]);
+    setMapZoom(17);
     setFocusTrigger(prev => prev + 1);
   };
 
@@ -409,6 +478,7 @@ export default function RealTimeMonitor() {
                   key={`inst-${inst.id}`} 
                   position={[Number(inst.latitude), Number(inst.longitude)]}
                   icon={createInstallationIcon(inst.name)}
+                  zIndexOffset={100}
                 >
                   <Popup>
                     <div style={styles.popup}>
@@ -432,19 +502,27 @@ export default function RealTimeMonitor() {
               .filter(shift => shift && shift.latitude !== null && shift.latitude !== undefined && shift.longitude !== null && shift.longitude !== undefined)
               .map((shift) => {
                 const currentRound = activeRounds.find(r => r.guardName === shift.guardName);
-                const lat = currentRound ? currentRound.latitude : Number(shift.latitude);
-                const lng = currentRound ? currentRound.longitude : Number(shift.longitude);
+                const rawLat = currentRound ? Number(currentRound.latitude) : Number(shift.latitude);
+                const rawLng = currentRound ? Number(currentRound.longitude) : Number(shift.longitude);
 
-                if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) return null;
+                if (isNaN(rawLat) || isNaN(rawLng) || rawLat === 0 || rawLng === 0) return null;
+
+                const [lat, lng] = guardPositions[shift.guardName] || [rawLat, rawLng];
+                const isFocused = focusedGuardName === shift.guardName;
 
                 return (
                   <Marker 
                     key={`guard-${shift.id}`} 
+                    ref={(el) => { if (el) markerRefs.current[shift.guardName] = el; }}
                     position={[lat, lng]}
+                    zIndexOffset={isFocused ? 3000 : (currentRound ? 1000 : 500)}
+                    eventHandlers={{
+                      click: () => setFocusedGuardName(shift.guardName),
+                    }}
                     icon={
                       currentRound 
-                        ? (currentRound.hasSos ? createSosIcon(shift.guardName) : createGuardIcon(shift.guardName))
-                        : createIdleGuardIcon(shift.guardName)
+                        ? (currentRound.hasSos ? createSosIcon(shift.guardName, isFocused) : createGuardIcon(shift.guardName, isFocused))
+                        : createIdleGuardIcon(shift.guardName, isFocused)
                     }
                   >
                     <Popup>
@@ -593,7 +671,7 @@ export default function RealTimeMonitor() {
                       </div>
 
                       <button 
-                        onClick={() => handleCenterMarker(round.latitude, round.longitude)}
+                        onClick={() => handleCenterMarker(round.latitude, round.longitude, round.guardName)}
                         style={round.hasSos ? styles.centerBtnActiveSos : styles.centerBtn}
                       >
                         <Navigation size={13} />
@@ -639,7 +717,7 @@ export default function RealTimeMonitor() {
 
                         {(shift.latitude && shift.longitude && Number(shift.latitude) !== 0) && (
                           <button 
-                            onClick={() => handleCenterMarker(Number(shift.latitude), Number(shift.longitude))}
+                            onClick={() => handleCenterMarker(Number(shift.latitude), Number(shift.longitude), shift.guardName)}
                             style={styles.centerBtn}
                           >
                             <Navigation size={13} />
