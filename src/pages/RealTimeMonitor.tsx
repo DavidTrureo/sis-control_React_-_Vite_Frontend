@@ -5,6 +5,22 @@ import { Shield, MapPin, Navigation, Clock, User, Building2, CheckCircle2, Loade
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
+// Fórmula Haversine para calcular distancia en metros entre el guardia y su instalación
+function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return 0;
+  const R = 6371000;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return Math.round(R * c);
+}
+
 // Componente para re-centrar el mapa únicamente cuando hay una solicitud explícita (carga inicial o clic del usuario)
 function ChangeView({ center, zoom, trigger }: { center: [number, number]; zoom: number; trigger: number }) {
   const map = useMap();
@@ -294,7 +310,10 @@ export default function RealTimeMonitor() {
             const rondaObj = detailData.ronda;
             const checklogsList = detailData.escaneos || [];
             
-            // Determinar la coordenada geolocalizada reportada
+            const guardNameStr = rondaObj.worker?.fullName || 'Guardia de Seguridad';
+            const matchingShift = shiftsList.find(s => s.guardName === guardNameStr);
+
+            // Determinar la coordenada geolocalizada reportada (priorizando GPS en vivo del turno o último checklog)
             let lat = Number(rondaObj.installation?.latitude) || -33.4489;
             let lng = Number(rondaObj.installation?.longitude) || -70.6693;
             
@@ -305,6 +324,16 @@ export default function RealTimeMonitor() {
                 lng = Number(lastLog.longitude);
               }
             }
+            if (matchingShift?.latitude && matchingShift?.longitude) {
+              lat = Number(matchingShift.latitude);
+              lng = Number(matchingShift.longitude);
+            }
+
+            const instLat = Number(rondaObj.installation?.latitude);
+            const instLng = Number(rondaObj.installation?.longitude);
+            const allowedRadius = Number(rondaObj.installation?.radiusInMeters) || 100;
+            const distanceMeters = (instLat && instLng) ? getDistanceInMeters(lat, lng, instLat, instLng) : 0;
+            const outsidePerimeter = distanceMeters > allowedRadius;
 
             const hasSos = detailData.incidentes?.some((i: any) => 
               i.status === 0 && 
@@ -316,7 +345,7 @@ export default function RealTimeMonitor() {
 
             return {
               id: rondaObj.id,
-              guardName: rondaObj.worker?.fullName || 'Guardia de Seguridad',
+              guardName: guardNameStr,
               installationName: rondaObj.installation?.name || 'Sede Operativa',
               escaneados: execCp,
               totalCheckpoints: totalCp,
@@ -324,7 +353,10 @@ export default function RealTimeMonitor() {
               latitude: lat,
               longitude: lng,
               startTime: summary.startTime ? summary.startTime.substring(0, 5) : '00:00',
-              hasSos
+              hasSos,
+              outsidePerimeter,
+              distanceMeters,
+              allowedRadius
             };
           }
           return null;
@@ -507,6 +539,15 @@ export default function RealTimeMonitor() {
 
                 if (isNaN(rawLat) || isNaN(rawLng) || rawLat === 0 || rawLng === 0) return null;
 
+                const assignedInst = (Array.isArray(installations) ? installations : []).find(
+                  inst => inst.name === (currentRound?.installationName || shift.location)
+                );
+                const instRadius = Number(assignedInst?.radiusInMeters) || 100;
+                const distFromInst = (assignedInst?.latitude && assignedInst?.longitude)
+                  ? getDistanceInMeters(rawLat, rawLng, Number(assignedInst.latitude), Number(assignedInst.longitude))
+                  : (currentRound?.distanceMeters || 0);
+                const isOutsidePerimeter = currentRound?.outsidePerimeter || (distFromInst > instRadius);
+
                 const [lat, lng] = guardPositions[shift.guardName] || [rawLat, rawLng];
                 const isFocused = focusedGuardName === shift.guardName;
 
@@ -538,6 +579,11 @@ export default function RealTimeMonitor() {
                             <p style={styles.popupName}>{shift.guardName}</p>
                             <p style={styles.popupSede}>Sede: {currentRound.installationName}</p>
                             <p style={styles.popupStartTime}>Hora de Inicio: {currentRound.startTime} hrs</p>
+                            {isOutsidePerimeter && (
+                              <div style={{ marginTop: '6px', padding: '4px 8px', borderRadius: '6px', backgroundColor: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.4)', color: '#fca5a5', fontSize: '11px', fontWeight: 700 }}>
+                                ⚠️ Fuera de Perímetro ({distFromInst}m / máx. {instRadius}m)
+                              </div>
+                            )}
                             
                             <div style={styles.popupProgress}>
                               <span style={styles.popupRondaText}>Ronda: {currentRound.escaneados}/{currentRound.totalCheckpoints} Escaneados</span>
@@ -557,6 +603,11 @@ export default function RealTimeMonitor() {
                             <p style={styles.popupName}>{shift.guardName}</p>
                             <p style={styles.popupSede}>Instalación: {shift.location || 'Sede Principal'}</p>
                             <p style={styles.popupStartTime}>Hora de Entrada: {shift.entryTime ? shift.entryTime.substring(11, 16) : '--:--'} hrs</p>
+                            {isOutsidePerimeter && (
+                              <div style={{ marginTop: '6px', padding: '4px 8px', borderRadius: '6px', backgroundColor: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.4)', color: '#fca5a5', fontSize: '11px', fontWeight: 700 }}>
+                                ⚠️ Fuera de Perímetro ({distFromInst}m / máx. {instRadius}m)
+                              </div>
+                            )}
                             <div style={{ ...styles.popupProgress, color: '#94a3b8', fontSize: '11.5px', marginTop: '6px' }}>
                               <span>El guardia inició su turno y está disponible. Aún no ha iniciado una ronda de patrullaje.</span>
                             </div>
@@ -638,7 +689,7 @@ export default function RealTimeMonitor() {
                   {activeRounds.map((round) => (
                     <div 
                       key={`list-round-${round.id}`} 
-                      style={round.hasSos ? styles.roundCardSosActive : styles.roundCard}
+                      style={round.hasSos || round.outsidePerimeter ? styles.roundCardSosActive : styles.roundCard}
                     >
                       <div style={styles.cardTopRow}>
                         <div style={styles.guardLabel}>
@@ -655,6 +706,12 @@ export default function RealTimeMonitor() {
                         <MapPin size={13} color="#3b82f6" />
                         <span style={styles.instName}>{round.installationName}</span>
                       </div>
+
+                      {round.outsidePerimeter && (
+                        <div style={{ padding: '5px 8px', borderRadius: '6px', backgroundColor: 'rgba(239, 68, 68, 0.14)', border: '1px solid rgba(239, 68, 68, 0.4)', color: '#fca5a5', fontSize: '11.5px', fontWeight: 700 }}>
+                          ⚠️ Fuera de Perímetro ({round.distanceMeters}m / máx. {round.allowedRadius}m)
+                        </div>
+                      )}
 
                       <div style={styles.progressBox}>
                         <div style={styles.progressHeader}>
@@ -690,42 +747,59 @@ export default function RealTimeMonitor() {
                   </span>
                   {(Array.isArray(activeShifts) ? activeShifts : [])
                     .filter(s => !(Array.isArray(activeRounds) ? activeRounds : []).some(r => r.guardName === s.guardName))
-                    .map((shift) => (
-                      <div 
-                        key={`list-shift-${shift.id}`} 
-                        style={{ ...styles.roundCard, borderLeft: '3px solid #d97706' }}
-                      >
-                        <div style={styles.cardTopRow}>
-                          <div style={styles.guardLabel}>
-                            <User size={15} color="#94a3b8" />
-                            <span style={styles.guardName}>{shift.guardName}</span>
+                    .map((shift) => {
+                      const assignedInst = (Array.isArray(installations) ? installations : []).find(
+                        inst => inst.name === shift.location
+                      );
+                      const instRadius = Number(assignedInst?.radiusInMeters) || 100;
+                      const distFromInst = (assignedInst?.latitude && assignedInst?.longitude && shift.latitude && shift.longitude)
+                        ? getDistanceInMeters(Number(shift.latitude), Number(shift.longitude), Number(assignedInst.latitude), Number(assignedInst.longitude))
+                        : 0;
+                      const shiftOutside = distFromInst > instRadius;
+
+                      return (
+                        <div 
+                          key={`list-shift-${shift.id}`} 
+                          style={{ ...styles.roundCard, borderLeft: shiftOutside ? '3px solid #ef4444' : '3px solid #d97706' }}
+                        >
+                          <div style={styles.cardTopRow}>
+                            <div style={styles.guardLabel}>
+                              <User size={15} color="#94a3b8" />
+                              <span style={styles.guardName}>{shift.guardName}</span>
+                            </div>
+                            <div style={styles.timeBadge}>
+                              <Clock size={11} color="#64748b" />
+                              <span style={styles.timeText}>{shift.entryTime ? shift.entryTime.substring(11, 16) : '--:--'} hrs</span>
+                            </div>
                           </div>
-                          <div style={styles.timeBadge}>
-                            <Clock size={11} color="#64748b" />
-                            <span style={styles.timeText}>{shift.entryTime ? shift.entryTime.substring(11, 16) : '--:--'} hrs</span>
+
+                          <div style={styles.instLabel}>
+                            <MapPin size={13} color="#3b82f6" />
+                            <span style={styles.instName}>{shift.location || 'Sede Principal'}</span>
                           </div>
-                        </div>
 
-                        <div style={styles.instLabel}>
-                          <MapPin size={13} color="#3b82f6" />
-                          <span style={styles.instName}>{shift.location || 'Sede Principal'}</span>
-                        </div>
+                          {shiftOutside && (
+                            <div style={{ padding: '5px 8px', borderRadius: '6px', backgroundColor: 'rgba(239, 68, 68, 0.14)', border: '1px solid rgba(239, 68, 68, 0.4)', color: '#fca5a5', fontSize: '11.5px', fontWeight: 700 }}>
+                              ⚠️ Fuera de Perímetro ({distFromInst}m / máx. {instRadius}m)
+                            </div>
+                          )}
 
-                        <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: '1.4' }}>
-                          Guardia con jornada iniciada. Disponible y a la espera de patrullar.
-                        </div>
+                          <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: '1.4' }}>
+                            Guardia con jornada iniciada. Disponible y a la espera de patrullar.
+                          </div>
 
-                        {(shift.latitude && shift.longitude && Number(shift.latitude) !== 0) && (
-                          <button 
-                            onClick={() => handleCenterMarker(Number(shift.latitude), Number(shift.longitude), shift.guardName)}
-                            style={styles.centerBtn}
-                          >
-                            <Navigation size={13} />
-                            <span>Centrar en Mapa</span>
-                          </button>
-                        )}
-                      </div>
-                    ))}
+                          {(shift.latitude && shift.longitude && Number(shift.latitude) !== 0) && (
+                            <button 
+                              onClick={() => handleCenterMarker(Number(shift.latitude), Number(shift.longitude), shift.guardName)}
+                              style={styles.centerBtn}
+                            >
+                              <Navigation size={13} />
+                              <span>Centrar en Mapa</span>
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
                 </div>
               )}
             </>
