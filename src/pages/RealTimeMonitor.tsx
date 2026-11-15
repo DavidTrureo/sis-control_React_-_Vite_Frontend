@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import { api, TokenService } from '../services/api';
 import { Shield, MapPin, Navigation, Clock, User, Building2, CheckCircle2, Loader2, BellRing } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -257,6 +258,8 @@ export default function RealTimeMonitor() {
   const isInitialLoadRef = useRef(true);
   const lastPulseRef = useRef<number>(0);
   const markerRefs = useRef<Record<string, any>>({});
+  const prevPresenceStatusRef = useRef<Record<string, string>>({});
+  const toast = useToast();
 
   const currentUser = TokenService.getUser();
   const currentUserId = currentUser?.userId || 1;
@@ -290,6 +293,19 @@ export default function RealTimeMonitor() {
         : `/api/reportes/dashboard-supervisor/${currentUserId}`;
       const resStats = await api.get(endpoint);
       shiftsList = Array.isArray(resStats.data?.activeShiftsList) ? resStats.data.activeShiftsList : [];
+      shiftsList.forEach((s: any) => {
+        if (!s?.guardName) return;
+        const prevStatus = prevPresenceStatusRef.current[s.guardName];
+        const currStatus = s.presenceStatus || 'IDLE';
+        if (prevStatus === 'PENDING' && currStatus === 'CONFIRMED') {
+          toast.success(`✅ ${s.guardName} confirmó su presencia en puesto (${s.presenceUpdatedAt || 'ahora'})`);
+          setPingSentGuards(prev => ({ ...prev, [s.guardName]: false }));
+        } else if (prevStatus === 'PENDING' && currStatus === 'EXPIRED') {
+          toast.error(`🚨 ${s.guardName} NO respondió al Control de Presencia en los 60 segundos`);
+          setPingSentGuards(prev => ({ ...prev, [s.guardName]: false }));
+        }
+        prevPresenceStatusRef.current[s.guardName] = currStatus;
+      });
       setActiveShifts(shiftsList);
     } catch (err) {
       console.error('Error fetching shifts list:', err);
@@ -357,7 +373,10 @@ export default function RealTimeMonitor() {
               hasSos,
               outsidePerimeter,
               distanceMeters,
-              allowedRadius
+              allowedRadius,
+              presenceStatus: matchingShift?.presenceStatus || 'IDLE',
+              presenceRemainingSeconds: matchingShift?.presenceRemainingSeconds || 0,
+              presenceUpdatedAt: matchingShift?.presenceUpdatedAt || null
             };
           }
           return null;
@@ -408,7 +427,7 @@ export default function RealTimeMonitor() {
       }
     };
 
-    const interval = setInterval(checkPulseAndSync, 10000);
+    const interval = setInterval(checkPulseAndSync, 3500);
     const handleVisibilityChange = () => {
       if (!document.hidden) checkPulseAndSync();
     };
@@ -492,17 +511,21 @@ export default function RealTimeMonitor() {
     if (pingSentGuards[guardName]) return;
     try {
       setPingSentGuards(prev => ({ ...prev, [guardName]: true }));
+      prevPresenceStatusRef.current[guardName] = 'PENDING';
       await api.post('/api/rondas/presencia/solicitar', {
         shiftId: shiftId || null,
         guardName,
         adminId: currentUserId,
       });
+      toast.info(`🔔 Solicitud enviada a ${guardName}. Esperando confirmación (60s)...`);
+      await fetchRealTimeData(false);
       setTimeout(() => {
         setPingSentGuards(prev => ({ ...prev, [guardName]: false }));
       }, 62000);
     } catch (err) {
       console.error('Error solicitando control de presencia:', err);
       setPingSentGuards(prev => ({ ...prev, [guardName]: false }));
+      toast.error('No se pudo enviar la solicitud de verificación.');
     }
   };
 
@@ -756,18 +779,44 @@ export default function RealTimeMonitor() {
                         </button>
                         <button
                           onClick={() => handleRequestPresenceCheck(round.guardName)}
-                          disabled={!!pingSentGuards[round.guardName]}
+                          disabled={!!pingSentGuards[round.guardName] || round.presenceStatus === 'PENDING'}
                           style={{
                             ...styles.centerBtn,
                             flex: 1,
-                            color: pingSentGuards[round.guardName] ? '#94a3b8' : '#f59e0b',
-                            borderColor: pingSentGuards[round.guardName] ? 'rgba(255,255,255,0.06)' : 'rgba(245, 158, 11, 0.35)',
-                            backgroundColor: pingSentGuards[round.guardName] ? 'rgba(255,255,255,0.02)' : 'rgba(245, 158, 11, 0.08)',
+                            color: (pingSentGuards[round.guardName] || round.presenceStatus === 'PENDING')
+                              ? '#94a3b8'
+                              : round.presenceStatus === 'CONFIRMED'
+                                ? '#34d399'
+                                : round.presenceStatus === 'EXPIRED'
+                                  ? '#f87171'
+                                  : '#f59e0b',
+                            borderColor: (pingSentGuards[round.guardName] || round.presenceStatus === 'PENDING')
+                              ? 'rgba(255,255,255,0.06)'
+                              : round.presenceStatus === 'CONFIRMED'
+                                ? 'rgba(16, 185, 129, 0.4)'
+                                : round.presenceStatus === 'EXPIRED'
+                                  ? 'rgba(239, 68, 68, 0.4)'
+                                  : 'rgba(245, 158, 11, 0.35)',
+                            backgroundColor: (pingSentGuards[round.guardName] || round.presenceStatus === 'PENDING')
+                              ? 'rgba(255,255,255,0.02)'
+                              : round.presenceStatus === 'CONFIRMED'
+                                ? 'rgba(16, 185, 129, 0.12)'
+                                : round.presenceStatus === 'EXPIRED'
+                                  ? 'rgba(239, 68, 68, 0.12)'
+                                  : 'rgba(245, 158, 11, 0.08)',
                           }}
                           title="Solicita al guardia confirmar en 60s que tiene el teléfono en mano"
                         >
                           <BellRing size={13} />
-                          <span>{pingSentGuards[round.guardName] ? 'Esperando (60s)...' : 'Verificar Presencia'}</span>
+                          <span>
+                            {(pingSentGuards[round.guardName] || round.presenceStatus === 'PENDING')
+                              ? `⏳ Esperando (${round.presenceRemainingSeconds || 60}s)...`
+                              : round.presenceStatus === 'CONFIRMED'
+                                ? `✅ Confirmado (${round.presenceUpdatedAt?.substring(0, 5) || 'OK'})`
+                                : round.presenceStatus === 'EXPIRED'
+                                  ? `🚨 Sin Respuesta`
+                                  : 'Verificar Presencia'}
+                          </span>
                         </button>
                       </div>
                     </div>
@@ -836,18 +885,44 @@ export default function RealTimeMonitor() {
                             )}
                             <button
                               onClick={() => handleRequestPresenceCheck(shift.guardName, shift.id)}
-                              disabled={!!pingSentGuards[shift.guardName]}
+                              disabled={!!pingSentGuards[shift.guardName] || shift.presenceStatus === 'PENDING'}
                               style={{
                                 ...styles.centerBtn,
                                 flex: 1,
-                                color: pingSentGuards[shift.guardName] ? '#94a3b8' : '#f59e0b',
-                                borderColor: pingSentGuards[shift.guardName] ? 'rgba(255,255,255,0.06)' : 'rgba(245, 158, 11, 0.35)',
-                                backgroundColor: pingSentGuards[shift.guardName] ? 'rgba(255,255,255,0.02)' : 'rgba(245, 158, 11, 0.08)',
+                                color: (pingSentGuards[shift.guardName] || shift.presenceStatus === 'PENDING')
+                                  ? '#94a3b8'
+                                  : shift.presenceStatus === 'CONFIRMED'
+                                    ? '#34d399'
+                                    : shift.presenceStatus === 'EXPIRED'
+                                      ? '#f87171'
+                                      : '#f59e0b',
+                                borderColor: (pingSentGuards[shift.guardName] || shift.presenceStatus === 'PENDING')
+                                  ? 'rgba(255,255,255,0.06)'
+                                  : shift.presenceStatus === 'CONFIRMED'
+                                    ? 'rgba(16, 185, 129, 0.4)'
+                                    : shift.presenceStatus === 'EXPIRED'
+                                      ? 'rgba(239, 68, 68, 0.4)'
+                                      : 'rgba(245, 158, 11, 0.35)',
+                                backgroundColor: (pingSentGuards[shift.guardName] || shift.presenceStatus === 'PENDING')
+                                  ? 'rgba(255,255,255,0.02)'
+                                  : shift.presenceStatus === 'CONFIRMED'
+                                    ? 'rgba(16, 185, 129, 0.12)'
+                                    : shift.presenceStatus === 'EXPIRED'
+                                      ? 'rgba(239, 68, 68, 0.12)'
+                                      : 'rgba(245, 158, 11, 0.08)',
                               }}
                               title="Solicita al guardia confirmar en 60s que tiene el teléfono en mano"
                             >
                               <BellRing size={13} />
-                              <span>{pingSentGuards[shift.guardName] ? 'Esperando (60s)...' : 'Verificar Presencia'}</span>
+                              <span>
+                                {(pingSentGuards[shift.guardName] || shift.presenceStatus === 'PENDING')
+                                  ? `⏳ Esperando (${shift.presenceRemainingSeconds || 60}s)...`
+                                  : shift.presenceStatus === 'CONFIRMED'
+                                    ? `✅ Confirmado (${shift.presenceUpdatedAt?.substring(0, 5) || 'OK'})`
+                                    : shift.presenceStatus === 'EXPIRED'
+                                      ? `🚨 Sin Respuesta`
+                                      : 'Verificar Presencia'}
+                              </span>
                             </button>
                           </div>
                         </div>
