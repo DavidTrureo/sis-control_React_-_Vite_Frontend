@@ -24,6 +24,42 @@ interface ActiveRound {
   status: string;
 }
 
+// Formateador estricto de Fecha y Hora chilena 24 Horas (DD-MM-AAAA HH:mm:ss hrs)
+function formatDateTime24h(value?: string | null): string {
+  if (!value) return '--:-- hrs';
+  try {
+    let d: Date;
+    if (typeof value === 'string' && value.includes('-') && value.indexOf('-') === 2) {
+      const parts = value.split(' ');
+      const dateParts = parts[0].split('-');
+      const timeParts = parts[1] ? parts[1].split(':') : ['00', '00', '00'];
+      d = new Date(
+        Number(dateParts[2]),
+        Number(dateParts[1]) - 1,
+        Number(dateParts[0]),
+        Number(timeParts[0] || 0),
+        Number(timeParts[1] || 0),
+        Number(timeParts[2] || 0)
+      );
+    } else {
+      d = new Date(value);
+    }
+    if (isNaN(d.getTime())) return value;
+
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    const seconds = String(d.getSeconds()).padStart(2, '0');
+
+    return `${day}-${month}-${year} a las ${hours}:${minutes}:${seconds} hrs`;
+  } catch (e) {
+    return String(value);
+  }
+}
+
 export default function SupervisorConsole() {
   const toast = useToast();
   const [activeShifts, setActiveShifts] = useState<ActiveShift[]>([]);
@@ -334,7 +370,7 @@ export default function SupervisorConsole() {
                           <span style={styles.instName}>{shift.location}</span>
                         </div>
                       </div>
-                      <span style={styles.entryBadge}>Entrada: {shift.entryTime} hrs</span>
+                      <span style={styles.entryBadge}>Entrada: {formatDateTime24h(shift.entryTime)}</span>
                     </div>
 
                     <div style={styles.opCardFooter}>

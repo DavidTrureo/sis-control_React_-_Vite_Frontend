@@ -22,21 +22,121 @@ function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: num
   return Math.round(R * c);
 }
 
-// Formatear marca de tiempo de última señal GPS para auditoría de desconexión
+// Formatear marca de tiempo de última señal GPS para auditoría de desconexión (24 Horas estricto)
 function formatLastPing(isoString?: string | null): string {
   if (!isoString) return 'Sin registro de telemetría';
   try {
-    const d = new Date(isoString);
+    let d: Date;
+    if (typeof isoString === 'string' && isoString.includes('-') && isoString.indexOf('-') === 2) {
+      const parts = isoString.split(' ');
+      const dateParts = parts[0].split('-');
+      const timeParts = parts[1] ? parts[1].split(':') : ['00', '00', '00'];
+      d = new Date(
+        Number(dateParts[2]),
+        Number(dateParts[1]) - 1,
+        Number(dateParts[0]),
+        Number(timeParts[0] || 0),
+        Number(timeParts[1] || 0),
+        Number(timeParts[2] || 0)
+      );
+    } else {
+      d = new Date(isoString);
+    }
     if (isNaN(d.getTime())) return isoString;
-    const dateStr = d.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    const timeStr = d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    const seconds = String(d.getSeconds()).padStart(2, '0');
+
     const elapsedMinutes = Math.floor((Date.now() - d.getTime()) / 60000);
     const elapsedStr = elapsedMinutes > 60 
       ? `hace ${Math.floor(elapsedMinutes / 60)}h ${elapsedMinutes % 60}m`
       : `hace ${Math.max(1, elapsedMinutes)} min`;
-    return `${dateStr} a las ${timeStr} hrs (${elapsedStr})`;
+
+    return `${day}-${month}-${year} a las ${hours}:${minutes}:${seconds} hrs (${elapsedStr})`;
   } catch (e) {
     return isoString;
+  }
+}
+
+// Formateador estándar chileno de Fecha y Hora en 24h
+function formatDateTime24h(value?: string | null, includeSeconds = true): string {
+  if (!value) return '--:-- hrs';
+  try {
+    let d: Date;
+    if (typeof value === 'string' && value.includes('-') && value.indexOf('-') === 2) {
+      const parts = value.split(' ');
+      const dateParts = parts[0].split('-');
+      const timeParts = parts[1] ? parts[1].split(':') : ['00', '00', '00'];
+      d = new Date(
+        Number(dateParts[2]),
+        Number(dateParts[1]) - 1,
+        Number(dateParts[0]),
+        Number(timeParts[0] || 0),
+        Number(timeParts[1] || 0),
+        Number(timeParts[2] || 0)
+      );
+    } else {
+      d = new Date(value);
+    }
+    if (isNaN(d.getTime())) return String(value);
+
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    const seconds = String(d.getSeconds()).padStart(2, '0');
+
+    return includeSeconds 
+      ? `${day}-${month}-${year} a las ${hours}:${minutes}:${seconds} hrs`
+      : `${day}-${month}-${year} a las ${hours}:${minutes} hrs`;
+  } catch (e) {
+    return String(value);
+  }
+}
+
+// Formateador de etiqueta de inicio (resuelve el error "14-11 hrs" y muestra fecha + hora 24h)
+function formatShiftOrRoundBadge(rawDateTime?: string | null): string {
+  if (!rawDateTime) return '--:-- hrs';
+  try {
+    let d: Date;
+    if (typeof rawDateTime === 'string' && rawDateTime.includes('-') && rawDateTime.indexOf('-') === 2) {
+      const parts = rawDateTime.split(' ');
+      const dateParts = parts[0].split('-');
+      const timeParts = parts[1] ? parts[1].split(':') : ['00', '00'];
+      d = new Date(
+        Number(dateParts[2]),
+        Number(dateParts[1]) - 1,
+        Number(dateParts[0]),
+        Number(timeParts[0] || 0),
+        Number(timeParts[1] || 0)
+      );
+    } else {
+      d = new Date(rawDateTime);
+    }
+    if (isNaN(d.getTime())) {
+      return `${rawDateTime} hrs`;
+    }
+
+    const now = new Date();
+    const isToday = d.toDateString() === now.toDateString();
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+
+    if (isToday) {
+      return `Hoy ${hours}:${minutes} hrs`;
+    }
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    return `${day}-${month} ${hours}:${minutes} hrs`;
+  } catch (e) {
+    return `${rawDateTime} hrs`;
   }
 }
 
@@ -438,6 +538,7 @@ export default function RealTimeMonitor() {
               latitude: lat,
               longitude: lng,
               startTime: summary.startTime ? summary.startTime.substring(0, 5) : '00:00',
+              rawStartTime: summary.startTime || rondaObj.startTime || null,
               hasSos,
               outsidePerimeter,
               distanceMeters,
@@ -709,7 +810,7 @@ export default function RealTimeMonitor() {
                             </div>
                             <p style={styles.popupName}>{shift.guardName}</p>
                             <p style={styles.popupSede}>Sede: {currentRound.installationName}</p>
-                             <p style={styles.popupStartTime}>Hora de Inicio: {currentRound.startTime} hrs</p>
+                            <p style={styles.popupStartTime}>Inicio: {formatDateTime24h(currentRound.rawStartTime || currentRound.startTime, false)}</p>
                             {(!currentRound?.isOnline && !shift?.isOnline) ? (
                               <div style={{ marginTop: '6px', padding: '4px 8px', borderRadius: '6px', backgroundColor: 'rgba(71, 85, 105, 0.25)', border: '1px solid rgba(148, 163, 184, 0.35)', color: '#cbd5e1', fontSize: '11px' }}>
                                 ⚪ Perímetro No Verificable (Desconectado • Último GPS: {distFromInst}m)
@@ -754,7 +855,7 @@ export default function RealTimeMonitor() {
                             </div>
                             <p style={styles.popupName}>{shift.guardName}</p>
                             <p style={styles.popupSede}>Instalación: {shift.location || 'Sede Principal'}</p>
-                            <p style={styles.popupStartTime}>Hora de Entrada: {shift.entryTime ? shift.entryTime.substring(11, 16) : '--:--'} hrs</p>
+                            <p style={styles.popupStartTime}>Entrada: {formatDateTime24h(shift.entryTime, false)}</p>
                             {(!shift.isOnline) ? (
                               <div style={{ marginTop: '6px', padding: '4px 8px', borderRadius: '6px', backgroundColor: 'rgba(71, 85, 105, 0.25)', border: '1px solid rgba(148, 163, 184, 0.35)', color: '#cbd5e1', fontSize: '11px' }}>
                                 ⚪ Perímetro No Verificable (Desconectado • Último GPS: {distFromInst}m)
@@ -876,7 +977,7 @@ export default function RealTimeMonitor() {
                         </div>
                         <div style={styles.timeBadge}>
                           <Clock size={11} color="#64748b" />
-                          <span style={styles.timeText}>{round.startTime} hrs</span>
+                          <span style={styles.timeText}>{formatShiftOrRoundBadge(round.rawStartTime || round.startTime)}</span>
                         </div>
                       </div>
 
@@ -1029,7 +1130,7 @@ export default function RealTimeMonitor() {
                             </div>
                             <div style={styles.timeBadge}>
                               <Clock size={11} color="#64748b" />
-                              <span style={styles.timeText}>{shift.entryTime ? shift.entryTime.substring(11, 16) : '--:--'} hrs</span>
+                              <span style={styles.timeText}>{formatShiftOrRoundBadge(shift.entryTime)}</span>
                             </div>
                           </div>
 
