@@ -4,6 +4,7 @@ import { TokenService, api } from '../services/api';
 import logoImg from '../assets/logo.png';
 import { useToast } from '../context/ToastContext';
 import CopilotSIS from './CopilotSIS';
+import { formatDateTime24h } from '../utils/dateUtils';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -587,7 +588,7 @@ export default function DashboardLayout({ children, activeTab, onTabChange, titl
                           </div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <span style={{ color: '#64748b', fontSize: '11.5px' }}>
-                              {(alert.clientTimestamp || alert.createdAt) ? new Date(alert.clientTimestamp || alert.createdAt).toLocaleString('es-CL', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' }) : ''}
+                              {(alert.clientTimestamp || alert.createdAt) ? formatDateTime24h(alert.clientTimestamp || alert.createdAt, { includeSeconds: false, useRelativeToday: true, separator: ' ' }) : ''}
                             </span>
                             <button
                               onClick={(e) => handleQuickResolveFromBell(e, alert.id)}

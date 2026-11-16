@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Shield, Sparkles, Send, Bot, ChevronDown } from 'lucide-react';
 import { api } from '../services/api';
+import { formatTime24h } from '../utils/dateUtils';
 
 
 interface Message {
@@ -174,7 +175,7 @@ export default function CopilotSIS() {
                     {m.text}
                   </div>
                   <div style={styles.timestampText}>
-                    {m.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {formatTime24h(m.timestamp)}
                   </div>
                 </div>
               </div>

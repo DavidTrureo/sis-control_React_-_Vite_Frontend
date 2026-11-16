@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, TokenService, downloadFile } from '../services/api';
 import { useToast } from '../context/ToastContext';
+import { formatDateTime24h, formatTime24h } from '../utils/dateUtils';
 import { AlertOctagon, ShieldAlert, CheckCircle, Search, Filter, Camera, X, Check, Loader2, MapPin, Clock, User, Download, Footprints, AlertTriangle } from 'lucide-react';
 
 interface Incident {
@@ -220,7 +221,7 @@ export default function AlertsAndIncidents() {
                     </span>
                   </div>
                   <p style={styles.sosItemDesc}>{alertItem.description}</p>
-                  <span style={styles.sosItemTime}>Reportado a las: {new Date(alertItem.clientTimestamp || alertItem.createdAt || '').toLocaleTimeString('es-CL')}</span>
+                  <span style={styles.sosItemTime}>Reportado a las: {formatTime24h(alertItem.clientTimestamp || alertItem.createdAt, true)} hrs ({formatDateTime24h(alertItem.clientTimestamp || alertItem.createdAt, false)})</span>
                 </div>
                 <button 
                   onClick={() => handleOpenResolveModal(alertItem)}
@@ -429,7 +430,7 @@ export default function AlertsAndIncidents() {
                 )}
 
                 <span style={styles.incidentDate}>
-                  Reportado: {(incident.clientTimestamp || incident.createdAt) ? new Date((incident.clientTimestamp || incident.createdAt)!).toLocaleString('es-CL') : 'Reciente'}
+                  Reportado: {(incident.clientTimestamp || incident.createdAt) ? formatDateTime24h(incident.clientTimestamp || incident.createdAt) : 'Reciente'}
                 </span>
               </div>
 
@@ -590,7 +591,7 @@ export default function AlertsAndIncidents() {
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '13px' }}>
                 <Clock size={14} />
-                <span>Reportado: {(detailIncident.clientTimestamp || detailIncident.createdAt) ? new Date((detailIncident.clientTimestamp || detailIncident.createdAt)!).toLocaleString('es-CL') : 'Reciente'}</span>
+                <span>Reportado: {(detailIncident.clientTimestamp || detailIncident.createdAt) ? formatDateTime24h(detailIncident.clientTimestamp || detailIncident.createdAt) : 'Reciente'}</span>
               </div>
               {detailIncident.managedByName && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '13px' }}>
@@ -733,7 +734,7 @@ export default function AlertsAndIncidents() {
                     <div>
                       <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Inicio / Fin</span>
                       <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#94a3b8' }}>
-                        {roundDetails.ronda?.startTime ? new Date(roundDetails.ronda.startTime).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) : '-'} a {roundDetails.ronda?.endTime ? new Date(roundDetails.ronda.endTime).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) : 'En curso'}
+                        {roundDetails.ronda?.startTime ? formatTime24h(roundDetails.ronda.startTime) : '-'} a {roundDetails.ronda?.endTime ? formatTime24h(roundDetails.ronda.endTime) : 'En curso'}
                       </p>
                     </div>
                     <div>
@@ -784,7 +785,7 @@ export default function AlertsAndIncidents() {
                               </div>
 
                               <div style={{ fontSize: '12px', color: '#94a3b8' }}>
-                                📍 {scan.checkpoint?.locationDescription || 'Ubicación verificada'} • 🕒 {scan.scannedAt ? new Date(scan.scannedAt).toLocaleTimeString('es-CL') : ''} hrs
+                                📍 {scan.checkpoint?.locationDescription || 'Ubicación verificada'} • 🕒 {scan.scannedAt ? formatTime24h(scan.scannedAt, true) : ''} hrs
                               </div>
 
                               {scan.notes && (

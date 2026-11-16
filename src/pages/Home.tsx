@@ -4,6 +4,7 @@ import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, BarChart, 
 import { api, TokenService } from '../services/api';
 import logoImg from '../assets/logo.png';
 import { useToast } from '../context/ToastContext';
+import { formatTime24h, formatDateDMY } from '../utils/dateUtils';
 
 
 // Tipos para los datos locales
@@ -264,7 +265,7 @@ export default function Home({ onNavigate }: HomeProps) {
         type: 'incident',
         title: `${cleanTitle}${guardLabel}`,
         description: `${instLabel}${cleanDesc} — Severidad: ${inc.severity}`,
-        time: (inc.clientTimestamp || inc.createdAt) ? new Date(inc.clientTimestamp || inc.createdAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) : '',
+        time: (inc.clientTimestamp || inc.createdAt) ? formatTime24h(inc.clientTimestamp || inc.createdAt) : '',
         rawTime: inc.clientTimestamp || inc.createdAt,
         status: inc.severity,
         badgeColor: sevUpper === 'ALTA' ? '#ef4444' : sevUpper === 'MEDIA' ? '#eab308' : '#3b82f6',
@@ -278,7 +279,7 @@ export default function Home({ onNavigate }: HomeProps) {
         type: 'shift',
         title: `Jornada iniciada — ${shift.guardName || shift.worker?.fullName || 'Guardia'}`,
         description: `Instalación: ${shift.installationName || shift.installation?.name || shift.location || 'N/A'}`,
-        time: shift.entryTime ? new Date(shift.entryTime).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) : '',
+        time: shift.entryTime ? formatTime24h(shift.entryTime) : '',
         rawTime: shift.entryTime || shift.createdAt,
         status: 'JORNADA',
         badgeColor: '#10b981',
@@ -295,7 +296,7 @@ export default function Home({ onNavigate }: HomeProps) {
         type: 'round',
         title: `Ronda — ${round.guardName || round.worker?.fullName || 'Guardia'}`,
         description: `Estado: ${isCancelled ? 'CANCELADA' : isCompleted ? 'COMPLETADA' : round.status || 'N/A'} — ${round.installationName || round.installation?.name || round.location || ''}`,
-        time: round.startTime ? new Date(round.startTime).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) : '',
+        time: round.startTime ? formatTime24h(round.startTime) : '',
         rawTime: round.startTime || round.createdAt,
         status: isCancelled ? 'CANCELADA' : isCompleted ? 'COMPLETADA' : round.status,
         badgeColor: isCompleted ? '#10b981' : isCancelled ? '#ef4444' : '#3b82f6',
@@ -411,13 +412,13 @@ export default function Home({ onNavigate }: HomeProps) {
               <img class="logo-img" src="${logoBase64}" alt="SIS Control" />
               <h1 class="title">SIS Control</h1>
               <div class="divider"></div>
-              <p class="subtitle">INFORME DE SITUACIÓN OPERATIVA | ${new Date().toLocaleDateString('es-CL')} ${new Date().toLocaleTimeString('es-CL', {hour: '2-digit', minute:'2-digit'})}</p>
+              <p class="subtitle">INFORME DE SITUACIÓN OPERATIVA | ${formatDateDMY(new Date())} ${formatTime24h(new Date())} hrs</p>
             </div>
 
             <div class="kpi-container">
               <div class="kpi-card">
                 <span class="kpi-label">Fecha y Hora</span>
-                <p class="kpi-value">${new Date().toLocaleDateString('es-CL')} a las ${new Date().toLocaleTimeString('es-CL', {hour: '2-digit', minute:'2-digit'})}</p>
+                <p class="kpi-value">${formatDateDMY(new Date())} a las ${formatTime24h(new Date())} hrs</p>
               </div>
               <div class="kpi-card">
                 <span class="kpi-label">Despliegue Personal</span>
@@ -926,7 +927,7 @@ export default function Home({ onNavigate }: HomeProps) {
                     <div>
                       <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Inicio / Fin</span>
                       <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#94a3b8' }}>
-                        {roundDetails.ronda?.startTime ? new Date(roundDetails.ronda.startTime).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) : '-'} a {roundDetails.ronda?.endTime ? new Date(roundDetails.ronda.endTime).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) : 'En curso'}
+                        {roundDetails.ronda?.startTime ? formatTime24h(roundDetails.ronda.startTime) : '-'} a {roundDetails.ronda?.endTime ? formatTime24h(roundDetails.ronda.endTime) : 'En curso'}
                       </p>
                     </div>
                     <div>
@@ -977,7 +978,7 @@ export default function Home({ onNavigate }: HomeProps) {
                               </div>
 
                               <div style={{ fontSize: '12px', color: '#94a3b8' }}>
-                                📍 {scan.checkpoint?.locationDescription || 'Ubicación verificada'} • 🕒 {scan.scannedAt ? new Date(scan.scannedAt).toLocaleTimeString('es-CL') : ''} hrs
+                                📍 {scan.checkpoint?.locationDescription || 'Ubicación verificada'} • 🕒 {scan.scannedAt ? formatTime24h(scan.scannedAt, true) : ''} hrs
                               </div>
 
                               {scan.notes && (

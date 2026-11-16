@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, downloadFile } from '../services/api';
 import { useToast } from '../context/ToastContext';
+import { formatDateTime24h } from '../utils/dateUtils';
 import { 
   ClipboardList, Search, Filter, RefreshCw, Clock, User, 
   Database, Activity, ToggleRight, Trash2, Key, Info, ShieldAlert, Download,
@@ -283,7 +284,7 @@ export default function AuditLog() {
                   <td style={styles.tdDate}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <Clock size={14} color="#64748b" />
-                      <span>{new Date(log.createdAt).toLocaleString('es-CL')}</span>
+                      <span>{formatDateTime24h(log.createdAt, { includeSeconds: true, includeHrsSuffix: false, separator: ', ' })}</span>
                     </div>
                   </td>
                   <td style={styles.tdUser}>
