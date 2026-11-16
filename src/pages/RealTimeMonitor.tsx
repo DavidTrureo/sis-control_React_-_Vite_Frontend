@@ -22,6 +22,24 @@ function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: num
   return Math.round(R * c);
 }
 
+// Formatear marca de tiempo de última señal GPS para auditoría de desconexión
+function formatLastPing(isoString?: string | null): string {
+  if (!isoString) return 'Sin registro de telemetría';
+  try {
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return isoString;
+    const dateStr = d.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const timeStr = d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const elapsedMinutes = Math.floor((Date.now() - d.getTime()) / 60000);
+    const elapsedStr = elapsedMinutes > 60 
+      ? `hace ${Math.floor(elapsedMinutes / 60)}h ${elapsedMinutes % 60}m`
+      : `hace ${Math.max(1, elapsedMinutes)} min`;
+    return `${dateStr} a las ${timeStr} hrs (${elapsedStr})`;
+  } catch (e) {
+    return isoString;
+  }
+}
+
 // Componente para re-centrar el mapa únicamente cuando hay una solicitud explícita (carga inicial o clic del usuario)
 function ChangeView({ center, zoom, trigger }: { center: [number, number]; zoom: number; trigger: number }) {
   const map = useMap();
@@ -245,6 +263,56 @@ const createSosIcon = (name: string, isFocused = false) => L.divIcon({
   popupAnchor: [0, -21],
 });
 
+// 5. Icono para Guardia Desconectado (Gris/Rojo con indicador de pérdida de señal)
+const createDisconnectedGuardIcon = (name: string, isFocused = false) => L.divIcon({
+  className: 'custom-leaflet-icon',
+  html: `
+    <div style="
+      position: relative;
+      width: ${isFocused ? '40px' : '34px'};
+      height: ${isFocused ? '40px' : '34px'};
+      background-color: #1e293b;
+      border: ${isFocused ? '3px solid #ffffff' : '2.5px solid #ef4444'};
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: ${isFocused ? '0 0 20px rgba(239, 68, 68, 0.8)' : '0 0 10px rgba(239, 68, 68, 0.4)'};
+      opacity: 0.95;
+    ">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="1" y1="1" x2="23" y2="23"/>
+        <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/>
+        <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/>
+        <path d="M10.71 5.05A16 16 0 0 1 22.58 9"/>
+        <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/>
+        <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+        <line x1="12" y1="20" x2="12.01" y2="20"/>
+      </svg>
+      <div style="
+        position: absolute;
+        bottom: -24px;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: #dc2626;
+        border: ${isFocused ? '1.5px solid #ffffff' : 'none'};
+        color: #ffffff;
+        font-family: inherit;
+        font-size: ${isFocused ? '11px' : '10px'};
+        font-weight: 800;
+        padding: 2px 7px;
+        border-radius: 4px;
+        white-space: nowrap;
+        pointer-events: none;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+      ">🔴 ${name} (Desconectado)</div>
+    </div>
+  `,
+  iconSize: isFocused ? [40, 40] : [34, 34],
+  iconAnchor: isFocused ? [20, 20] : [17, 17],
+  popupAnchor: [0, -20],
+});
+
 export default function RealTimeMonitor() {
   const [activeRounds, setActiveRounds] = useState<any[]>([]);
   const [activeShifts, setActiveShifts] = useState<any[]>([]);
@@ -376,7 +444,10 @@ export default function RealTimeMonitor() {
               allowedRadius,
               presenceStatus: matchingShift?.presenceStatus || 'IDLE',
               presenceRemainingSeconds: matchingShift?.presenceRemainingSeconds || 0,
-              presenceUpdatedAt: matchingShift?.presenceUpdatedAt || null
+              presenceUpdatedAt: matchingShift?.presenceUpdatedAt || null,
+              lastLocationUpdate: summary.lastLocationUpdate || matchingShift?.lastLocationUpdate || null,
+              isOnline: summary.isOnline ?? matchingShift?.isOnline ?? true,
+              secondsSinceLastPing: summary.secondsSinceLastPing ?? matchingShift?.secondsSinceLastPing ?? 0
             };
           }
           return null;
@@ -603,9 +674,13 @@ export default function RealTimeMonitor() {
                       click: () => setFocusedGuardName(shift.guardName),
                     }}
                     icon={
-                      currentRound 
-                        ? (currentRound.hasSos ? createSosIcon(shift.guardName, isFocused) : createGuardIcon(shift.guardName, isFocused))
-                        : createIdleGuardIcon(shift.guardName, isFocused)
+                      currentRound?.hasSos
+                        ? createSosIcon(shift.guardName, isFocused)
+                        : (!currentRound?.isOnline && !shift?.isOnline)
+                          ? createDisconnectedGuardIcon(shift.guardName, isFocused)
+                          : currentRound
+                            ? createGuardIcon(shift.guardName, isFocused)
+                            : createIdleGuardIcon(shift.guardName, isFocused)
                     }
                   >
                     <Popup>
@@ -633,6 +708,23 @@ export default function RealTimeMonitor() {
                                 <div style={{ ...styles.popupProgressFill, width: `${currentRound.percent}%`, backgroundColor: currentRound.hasSos ? '#ef4444' : '#10b981' }}></div>
                               </div>
                             </div>
+
+                            {/* Estado de Conexión y Última Señal GPS */}
+                            {(!currentRound.isOnline || !shift.isOnline) ? (
+                              <div style={{ marginTop: '8px', padding: '6px 8px', borderRadius: '6px', backgroundColor: 'rgba(239, 68, 68, 0.16)', border: '1px solid rgba(239, 68, 68, 0.45)', color: '#fca5a5', fontSize: '11px', lineHeight: '1.4' }}>
+                                <div style={{ fontWeight: 800 }}>🔴 DESCONECTADO (Sin señal GPS)</div>
+                                <div style={{ fontSize: '10.5px', color: '#cbd5e1', marginTop: '2px' }}>
+                                  Última conexión: {formatLastPing(currentRound.lastLocationUpdate || shift.lastLocationUpdate)}
+                                </div>
+                                <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>
+                                  App posiblemente cerrada o sin conexión de datos.
+                                </div>
+                              </div>
+                            ) : (
+                              <div style={{ marginTop: '6px', fontSize: '11px', color: '#34d399', fontWeight: 600 }}>
+                                🟢 GPS En Vivo (hace {currentRound.secondsSinceLastPing || shift.secondsSinceLastPing || 0}s)
+                              </div>
+                            )}
                           </>
                         ) : (
                           <>
@@ -650,6 +742,24 @@ export default function RealTimeMonitor() {
                                 ⚠️ Fuera de Perímetro ({distFromInst}m / máx. {instRadius}m)
                               </div>
                             )}
+
+                            {/* Estado de Conexión y Última Señal GPS para Guardia en Espera */}
+                            {(!shift.isOnline) ? (
+                              <div style={{ marginTop: '8px', padding: '6px 8px', borderRadius: '6px', backgroundColor: 'rgba(239, 68, 68, 0.16)', border: '1px solid rgba(239, 68, 68, 0.45)', color: '#fca5a5', fontSize: '11px', lineHeight: '1.4' }}>
+                                <div style={{ fontWeight: 800 }}>🔴 DESCONECTADO (Sin señal GPS)</div>
+                                <div style={{ fontSize: '10.5px', color: '#cbd5e1', marginTop: '2px' }}>
+                                  Última conexión: {formatLastPing(shift.lastLocationUpdate)}
+                                </div>
+                                <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>
+                                  App posiblemente cerrada o sin conexión de datos.
+                                </div>
+                              </div>
+                            ) : (
+                              <div style={{ marginTop: '6px', fontSize: '11px', color: '#34d399', fontWeight: 600 }}>
+                                🟢 GPS En Vivo (hace {shift.secondsSinceLastPing || 0}s)
+                              </div>
+                            )}
+
                             <div style={{ ...styles.popupProgress, color: '#94a3b8', fontSize: '11.5px', marginTop: '6px' }}>
                               <span>El guardia inició su turno y está disponible. Aún no ha iniciado una ronda de patrullaje.</span>
                             </div>
@@ -690,6 +800,10 @@ export default function RealTimeMonitor() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: '#94a3b8' }}>
               <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#0f172a', border: '2.5px solid #d97706' }}></div>
               <span>Jornada Iniciada (En Espera)</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: '#94a3b8' }}>
+              <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#1e293b', border: '2.5px solid #ef4444' }}></div>
+              <span>🔴 Desconectado (Sin señal GPS)</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: '#94a3b8' }}>
               <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#7f1d1d', border: '3px solid #ef4444' }}></div>
@@ -748,6 +862,20 @@ export default function RealTimeMonitor() {
                         <MapPin size={13} color="#3b82f6" />
                         <span style={styles.instName}>{round.installationName}</span>
                       </div>
+
+                      {/* Estado de Conexión y Última Señal GPS */}
+                      {(!round.isOnline) ? (
+                        <div style={{ padding: '6px 8px', borderRadius: '6px', backgroundColor: 'rgba(239, 68, 68, 0.16)', border: '1px solid rgba(239, 68, 68, 0.45)', color: '#fca5a5', fontSize: '11px', lineHeight: '1.3' }}>
+                          <div style={{ fontWeight: 800 }}>🔴 DESCONECTADO (Sin señal GPS)</div>
+                          <div style={{ fontSize: '10.5px', color: '#cbd5e1', marginTop: '2px' }}>
+                            Última conexión: {formatLastPing(round.lastLocationUpdate)}
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: '11px', color: '#34d399', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span>🟢 GPS En Vivo (hace {round.secondsSinceLastPing || 0}s)</span>
+                        </div>
+                      )}
 
                       {round.outsidePerimeter && (
                         <div style={{ padding: '5px 8px', borderRadius: '6px', backgroundColor: 'rgba(239, 68, 68, 0.14)', border: '1px solid rgba(239, 68, 68, 0.4)', color: '#fca5a5', fontSize: '11.5px', fontWeight: 700 }}>
@@ -862,6 +990,20 @@ export default function RealTimeMonitor() {
                             <MapPin size={13} color="#3b82f6" />
                             <span style={styles.instName}>{shift.location || 'Sede Principal'}</span>
                           </div>
+
+                          {/* Estado de Conexión y Última Señal GPS */}
+                          {(!shift.isOnline) ? (
+                            <div style={{ padding: '6px 8px', borderRadius: '6px', backgroundColor: 'rgba(239, 68, 68, 0.16)', border: '1px solid rgba(239, 68, 68, 0.45)', color: '#fca5a5', fontSize: '11px', lineHeight: '1.3' }}>
+                              <div style={{ fontWeight: 800 }}>🔴 DESCONECTADO (Sin señal GPS)</div>
+                              <div style={{ fontSize: '10.5px', color: '#cbd5e1', marginTop: '2px' }}>
+                                Última conexión: {formatLastPing(shift.lastLocationUpdate)}
+                              </div>
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: '11px', color: '#34d399', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <span>🟢 GPS En Vivo (hace {shift.secondsSinceLastPing || 0}s)</span>
+                            </div>
+                          )}
 
                           {shiftOutside && (
                             <div style={{ padding: '5px 8px', borderRadius: '6px', backgroundColor: 'rgba(239, 68, 68, 0.14)', border: '1px solid rgba(239, 68, 68, 0.4)', color: '#fca5a5', fontSize: '11.5px', fontWeight: 700 }}>
