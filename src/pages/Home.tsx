@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
-import { Users, CheckCircle, Clock, ShieldAlert, Activity, Sparkles, Printer, Building2, TrendingUp, Lightbulb, Loader2, AlertTriangle } from 'lucide-react';
+import { Users, CheckCircle, Clock, ShieldAlert, Activity, Sparkles, Printer, Building2, TrendingUp, Lightbulb, Loader2, AlertTriangle, X, Camera, Footprints } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, BarChart, Bar, Cell, Legend, LineChart, Line } from 'recharts';
-import { api } from '../services/api';
+import { api, TokenService } from '../services/api';
 import logoImg from '../assets/logo.png';
 import { useToast } from '../context/ToastContext';
 
@@ -97,6 +97,31 @@ export default function Home({ onNavigate }: HomeProps) {
   const [loadingAi, setLoadingAi] = useState(false);
   const [aiPredictions, setAiPredictions] = useState<string | null>(null);
   const [loadingPredictions, setLoadingPredictions] = useState(false);
+
+  // Estados para Detalle de Ronda y Zoom de Fotos
+  const [selectedRoundId, setSelectedRoundId] = useState<number | null>(null);
+  const [roundDetails, setRoundDetails] = useState<any | null>(null);
+  const [roundModalOpen, setRoundModalOpen] = useState(false);
+  const [roundLoading, setRoundLoading] = useState(false);
+  const [zoomImage, setZoomImage] = useState<string | null>(null);
+
+  const handleOpenRoundModal = async (roundId: number) => {
+    try {
+      setSelectedRoundId(roundId);
+      setRoundModalOpen(true);
+      setRoundLoading(true);
+      setRoundDetails(null);
+      const user = TokenService.getUser();
+      const requesterId = user?.userId || user?.id || 1;
+      const res = await api.get(`/api/rondas/${roundId}?requesterId=${requesterId}`);
+      setRoundDetails(res.data);
+    } catch (err) {
+      console.error('Error fetching round details:', err);
+      toast.error('No se pudo cargar el detalle de la ronda.');
+    } finally {
+      setRoundLoading(false);
+    }
+  };
 
   // Cargar estadísticas y eventos en tiempo real
   useEffect(() => {
@@ -802,11 +827,20 @@ export default function Home({ onNavigate }: HomeProps) {
                 key={event.id} 
                 style={{
                   ...styles.eventItem,
-                  cursor: event.type === 'incident' ? 'pointer' : 'default',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s',
                 }}
                 onClick={() => {
-                  if (event.type === 'incident' && onNavigate) onNavigate('incidents');
+                  if (event.type === 'round') {
+                    const rawId = event.id.replace('round-', '');
+                    if (rawId && !isNaN(Number(rawId))) {
+                      handleOpenRoundModal(Number(rawId));
+                    }
+                  } else if (event.type === 'incident' && onNavigate) {
+                    onNavigate('incidents');
+                  }
                 }}
+                title={event.type === 'round' ? 'Haz clic para ver el recorrido y fotos de esta ronda' : 'Ver detalle'}
               >
                 <div style={{
                   ...styles.eventIndicator,
@@ -831,6 +865,229 @@ export default function Home({ onNavigate }: HomeProps) {
           )}
         </div>
       </div>
+
+      {/* MODAL DETALLADO DE RONDA (CHECKPOINTS Y EVIDENCIAS FOTOGRÁFICAS) */}
+      {roundModalOpen && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(3, 7, 18, 0.85)', backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px'
+        }}>
+          <div style={{
+            backgroundColor: '#0b132b', border: '1px solid #1e293b', borderRadius: '16px',
+            width: '100%', maxWidth: '800px', maxHeight: '85vh', overflow: 'hidden',
+            display: 'flex', flexDirection: 'column', boxShadow: '0 20px 40px rgba(0,0,0,0.6)'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '18px 24px', borderBottom: '1px solid #1e293b',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#070d1f'
+            }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Footprints size={20} color="#3b82f6" />
+                  Auditoría de Recorrido de Ronda #{selectedRoundId}
+                </h3>
+                <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#94a3b8' }}>
+                  Detalle de puntos de control escaneados, justificaciones y fotografías
+                </p>
+              </div>
+              <button 
+                onClick={() => setRoundModalOpen(false)}
+                style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '6px' }}
+              >
+                <X size={22} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: '24px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {roundLoading ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 0', gap: '12px' }}>
+                  <Loader2 size={32} className="spin-animation" color="#3b82f6" />
+                  <span style={{ color: '#94a3b8', fontSize: '14px' }}>Cargando datos y evidencias fotográficas de la ronda...</span>
+                </div>
+              ) : roundDetails ? (
+                <>
+                  {/* Resumen General */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', padding: '16px', backgroundColor: '#070d1f', borderRadius: '12px', border: '1px solid #1e293b' }}>
+                    <div>
+                      <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Recinto</span>
+                      <p style={{ margin: '4px 0 0 0', fontSize: '14px', color: '#f8fafc', fontWeight: 700 }}>
+                        {roundDetails.ronda?.installation?.name || 'Sede'}
+                      </p>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Guardia</span>
+                      <p style={{ margin: '4px 0 0 0', fontSize: '14px', color: '#f8fafc', fontWeight: 700 }}>
+                        {roundDetails.ronda?.worker?.fullName || 'Operador'}
+                      </p>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Inicio / Fin</span>
+                      <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#94a3b8' }}>
+                        {roundDetails.ronda?.startTime ? new Date(roundDetails.ronda.startTime).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) : '-'} a {roundDetails.ronda?.endTime ? new Date(roundDetails.ronda.endTime).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) : 'En curso'}
+                      </p>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Estado</span>
+                      <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#34d399', fontWeight: 800 }}>
+                        {roundDetails.ronda?.status || 'FINALIZADA'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Observaciones */}
+                  {roundDetails.ronda?.observations && (
+                    <div style={{ padding: '12px', borderRadius: '10px', backgroundColor: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+                      <span style={{ fontSize: '11px', color: '#60a5fa', fontWeight: 700, textTransform: 'uppercase' }}>Observaciones de la Ronda:</span>
+                      <p style={{ margin: '6px 0 0 0', fontSize: '13.5px', color: '#cbd5e1', lineHeight: '1.5' }}>
+                        {roundDetails.ronda.observations}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Lista de Checkpoints */}
+                  <div>
+                    <h4 style={{ fontSize: '15px', fontWeight: 700, color: '#f8fafc', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <CheckCircle size={16} color="#10b981" />
+                      Puntos de Control Escaneados ({roundDetails.escaneos?.length || 0})
+                    </h4>
+
+                    {(!roundDetails.escaneos || roundDetails.escaneos.length === 0) ? (
+                      <p style={{ color: '#64748b', fontSize: '13px', textAlign: 'center', padding: '20px' }}>No se registraron lecturas NFC en esta ronda.</p>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        {roundDetails.escaneos.map((scan: any, idx: number) => {
+                          const isOmitted = scan.status === 2;
+                          return (
+                            <div key={scan.id || idx} style={{ padding: '14px', borderRadius: '10px', backgroundColor: '#070d1f', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <span style={{ fontSize: '14px', fontWeight: 700, color: '#f8fafc' }}>
+                                  {idx + 1}. {scan.checkpoint?.name || 'Punto de Control'}
+                                </span>
+                                <span style={{
+                                  padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 700,
+                                  backgroundColor: isOmitted ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+                                  color: isOmitted ? '#f87171' : '#34d399',
+                                  border: `1px solid ${isOmitted ? 'rgba(239, 68, 68, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`
+                                }}>
+                                  {isOmitted ? 'Omitido' : 'Leído NFC'}
+                                </span>
+                              </div>
+
+                              <div style={{ fontSize: '12px', color: '#94a3b8' }}>
+                                📍 {scan.checkpoint?.locationDescription || 'Ubicación verificada'} • 🕒 {scan.scannedAt ? new Date(scan.scannedAt).toLocaleTimeString('es-CL') : ''} hrs
+                              </div>
+
+                              {scan.notes && (
+                                <div style={{ padding: '8px 10px', borderRadius: '6px', backgroundColor: 'rgba(245, 158, 11, 0.1)', borderLeft: '3px solid #f59e0b', fontSize: '12px', color: '#fbbf24' }}>
+                                  Justificación: "{scan.notes}"
+                                </div>
+                              )}
+
+                              {/* Foto de Evidencia del Checkpoint */}
+                              {scan.imageUrl && (
+                                <div 
+                                  onClick={() => setZoomImage(scan.imageUrl)}
+                                  style={{
+                                    marginTop: '6px', borderRadius: '8px', overflow: 'hidden', cursor: 'pointer',
+                                    border: '1px solid #1e293b', position: 'relative', width: 'fit-content'
+                                  }}
+                                  title="Haz clic para ampliar la fotografía de evidencia"
+                                >
+                                  <img src={scan.imageUrl} alt="Evidencia Checkpoint" style={{ height: '110px', width: '160px', objectFit: 'cover', display: 'block' }} />
+                                  <div style={{
+                                    position: 'absolute', bottom: 0, left: 0, right: 0,
+                                    backgroundColor: 'rgba(0,0,0,0.7)', padding: '3px 6px',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                                    color: '#fff', fontSize: '10.5px', fontWeight: 700
+                                  }}>
+                                    <Camera size={12} />
+                                    <span>Ampliar</span>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Incidentes de la ronda */}
+                  {roundDetails.incidentes && roundDetails.incidentes.length > 0 && (
+                    <div>
+                      <h4 style={{ fontSize: '15px', fontWeight: 700, color: '#f87171', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <AlertTriangle size={16} color="#ef4444" />
+                        Incidentes Reportados ({roundDetails.incidentes.length})
+                      </h4>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        {roundDetails.incidentes.map((inc: any) => (
+                          <div key={inc.id} style={{ padding: '12px', borderRadius: '10px', backgroundColor: '#070d1f', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                              <span style={{ fontSize: '13.5px', fontWeight: 700, color: '#fca5a5' }}>{inc.title}</span>
+                              <span style={{ fontSize: '11px', fontWeight: 700, color: '#f87171' }}>{inc.severity}</span>
+                            </div>
+                            <p style={{ margin: '4px 0', fontSize: '12.5px', color: '#cbd5e1' }}>{inc.description}</p>
+                            {(inc.imageUrl || inc.checklogImageUrl) && (
+                              <div 
+                                onClick={() => setZoomImage(inc.imageUrl || inc.checklogImageUrl)}
+                                style={{ marginTop: '8px', cursor: 'pointer', width: 'fit-content', borderRadius: '8px', overflow: 'hidden', border: '1px solid #1e293b' }}
+                              >
+                                <img src={inc.imageUrl || inc.checklogImageUrl} alt="Incidente" style={{ height: '110px', width: '160px', objectFit: 'cover', display: 'block' }} />
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p style={{ color: '#64748b', textAlign: 'center', padding: '40px' }}>No se pudo obtener información de la ronda.</p>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{ padding: '14px 24px', borderTop: '1px solid #1e293b', display: 'flex', justifyContent: 'flex-end', backgroundColor: '#070d1f' }}>
+              <button onClick={() => setRoundModalOpen(false)} className="btn-secondary" style={{ padding: '8px 20px' }}>
+                Cerrar Auditoría
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL ZOOM FULLSCREEN DE FOTOS */}
+      {zoomImage && (
+        <div 
+          onClick={() => setZoomImage(null)}
+          style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.94)', zIndex: 2000,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
+          }}
+        >
+          <button 
+            onClick={() => setZoomImage(null)}
+            style={{
+              position: 'absolute', top: '24px', right: '24px',
+              background: 'rgba(255, 255, 255, 0.1)', border: 'none', color: '#ffffff',
+              borderRadius: '50%', width: '40px', height: '40px', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}
+          >
+            <X size={24} />
+          </button>
+          <img 
+            src={zoomImage} 
+            alt="Evidencia Ampliada" 
+            style={{ maxWidth: '90vw', maxHeight: '88vh', objectFit: 'contain', borderRadius: '8px' }} 
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 }
