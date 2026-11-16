@@ -377,10 +377,10 @@ export default function DashboardLayout({ children, activeTab, onTabChange, titl
     <div style={styles.container}>
       {/* SIDEBAR */}
       <aside style={styles.sidebar}>
-        {/* LOGO — Agrandado */}
+        {/* LOGO */}
         <div style={styles.logoContainer}>
-          <div style={{ ...styles.logoBadge, width: '52px', height: '52px' }}>
-            <img src={logoImg} alt="SIS-Control Logo" style={{ width: '40px', height: '40px', objectFit: 'contain' }} />
+          <div style={styles.logoBadge}>
+            <img src={logoImg} alt="SIS-Control Logo" style={{ width: '42px', height: '42px', objectFit: 'contain', filter: 'drop-shadow(0 4px 12px rgba(30, 64, 175, 0.4))' }} />
           </div>
           <div style={styles.logoTextWrapper}>
             <span style={{ ...styles.logoTitle, fontSize: '18px' }}>SIS-CONTROL</span>
@@ -1009,11 +1009,8 @@ const styles: Record<string, React.CSSProperties> = {
     paddingLeft: '8px',
   },
   logoBadge: {
-    width: '36px',
-    height: '36px',
-    borderRadius: '8px',
-    backgroundColor: 'rgba(29, 78, 216, 0.1)',
-    border: '1px solid rgba(29, 78, 216, 0.15)',
+    width: '42px',
+    height: '42px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
