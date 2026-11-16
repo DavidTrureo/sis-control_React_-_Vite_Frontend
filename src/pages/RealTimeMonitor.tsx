@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import { api, TokenService } from '../services/api';
-import { Shield, MapPin, Navigation, Clock, User, Building2, CheckCircle2, Loader2, BellRing } from 'lucide-react';
+import { Shield, MapPin, Navigation, Clock, User, Building2, CheckCircle2, Loader2, BellRing, XCircle } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -600,6 +600,20 @@ export default function RealTimeMonitor() {
     }
   };
 
+  const handleForceCloseShift = async (shiftId: number, guardName: string) => {
+    if (!window.confirm(`¿Deseas finalizar administrativamente la jornada de ${guardName}? Se cerrará la ronda activa y se removerá del mapa en vivo.`)) {
+      return;
+    }
+    try {
+      await api.put(`/api/rondas/jornada/cancelar/${shiftId}?adminId=${currentUserId}`);
+      toast.success(`✅ Turno de ${guardName} finalizado exitosamente.`);
+      await fetchRealTimeData(false);
+    } catch (err: any) {
+      const msg = err.response?.data?.message || err.response?.data?.error || 'No se pudo finalizar el turno.';
+      toast.error(msg);
+    }
+  };
+
   return (
     <div style={styles.container}>
       {/* VISTA MAPA DE LEAFLET */}
@@ -695,12 +709,16 @@ export default function RealTimeMonitor() {
                             </div>
                             <p style={styles.popupName}>{shift.guardName}</p>
                             <p style={styles.popupSede}>Sede: {currentRound.installationName}</p>
-                            <p style={styles.popupStartTime}>Hora de Inicio: {currentRound.startTime} hrs</p>
-                            {isOutsidePerimeter && (
+                             <p style={styles.popupStartTime}>Hora de Inicio: {currentRound.startTime} hrs</p>
+                            {(!currentRound?.isOnline && !shift?.isOnline) ? (
+                              <div style={{ marginTop: '6px', padding: '4px 8px', borderRadius: '6px', backgroundColor: 'rgba(71, 85, 105, 0.25)', border: '1px solid rgba(148, 163, 184, 0.35)', color: '#cbd5e1', fontSize: '11px' }}>
+                                ⚪ Perímetro No Verificable (Desconectado • Último GPS: {distFromInst}m)
+                              </div>
+                            ) : isOutsidePerimeter ? (
                               <div style={{ marginTop: '6px', padding: '4px 8px', borderRadius: '6px', backgroundColor: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.4)', color: '#fca5a5', fontSize: '11px', fontWeight: 700 }}>
                                 ⚠️ Fuera de Perímetro ({distFromInst}m / máx. {instRadius}m)
                               </div>
-                            )}
+                            ) : null}
                             
                             <div style={styles.popupProgress}>
                               <span style={styles.popupRondaText}>Ronda: {currentRound.escaneados}/{currentRound.totalCheckpoints} Escaneados</span>
@@ -737,11 +755,15 @@ export default function RealTimeMonitor() {
                             <p style={styles.popupName}>{shift.guardName}</p>
                             <p style={styles.popupSede}>Instalación: {shift.location || 'Sede Principal'}</p>
                             <p style={styles.popupStartTime}>Hora de Entrada: {shift.entryTime ? shift.entryTime.substring(11, 16) : '--:--'} hrs</p>
-                            {isOutsidePerimeter && (
+                            {(!shift.isOnline) ? (
+                              <div style={{ marginTop: '6px', padding: '4px 8px', borderRadius: '6px', backgroundColor: 'rgba(71, 85, 105, 0.25)', border: '1px solid rgba(148, 163, 184, 0.35)', color: '#cbd5e1', fontSize: '11px' }}>
+                                ⚪ Perímetro No Verificable (Desconectado • Último GPS: {distFromInst}m)
+                              </div>
+                            ) : isOutsidePerimeter ? (
                               <div style={{ marginTop: '6px', padding: '4px 8px', borderRadius: '6px', backgroundColor: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.4)', color: '#fca5a5', fontSize: '11px', fontWeight: 700 }}>
                                 ⚠️ Fuera de Perímetro ({distFromInst}m / máx. {instRadius}m)
                               </div>
-                            )}
+                            ) : null}
 
                             {/* Estado de Conexión y Última Señal GPS para Guardia en Espera */}
                             {(!shift.isOnline) ? (
@@ -870,6 +892,9 @@ export default function RealTimeMonitor() {
                           <div style={{ fontSize: '10.5px', color: '#cbd5e1', marginTop: '2px' }}>
                             Última conexión: {formatLastPing(round.lastLocationUpdate)}
                           </div>
+                          <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '3px' }}>
+                            Perímetro no verificable (último GPS reportado: {round.distanceMeters}m de sede).
+                          </div>
                         </div>
                       ) : (
                         <div style={{ fontSize: '11px', color: '#34d399', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -877,7 +902,7 @@ export default function RealTimeMonitor() {
                         </div>
                       )}
 
-                      {round.outsidePerimeter && (
+                      {round.isOnline && round.outsidePerimeter && (
                         <div style={{ padding: '5px 8px', borderRadius: '6px', backgroundColor: 'rgba(239, 68, 68, 0.14)', border: '1px solid rgba(239, 68, 68, 0.4)', color: '#fca5a5', fontSize: '11.5px', fontWeight: 700 }}>
                           ⚠️ Fuera de Perímetro ({round.distanceMeters}m / máx. {round.allowedRadius}m)
                         </div>
@@ -947,6 +972,28 @@ export default function RealTimeMonitor() {
                           </span>
                         </button>
                       </div>
+
+                      {/* Botón de cierre forzoso si está desconectado */}
+                      {(!round.isOnline) && (
+                        <button
+                          onClick={() => {
+                            const matchingShift = activeShifts.find(s => s.guardName === round.guardName);
+                            handleForceCloseShift(matchingShift?.id || round.id, round.guardName);
+                          }}
+                          style={{
+                            ...styles.centerBtn,
+                            color: '#f87171',
+                            borderColor: 'rgba(239, 68, 68, 0.4)',
+                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                            marginTop: '8px',
+                            width: '100%',
+                          }}
+                          title="Finaliza la jornada y ronda en la base de datos y la quita del monitoreo activo"
+                        >
+                          <XCircle size={13} />
+                          <span>Finalizar Turno Administrativamente</span>
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -998,6 +1045,9 @@ export default function RealTimeMonitor() {
                               <div style={{ fontSize: '10.5px', color: '#cbd5e1', marginTop: '2px' }}>
                                 Última conexión: {formatLastPing(shift.lastLocationUpdate)}
                               </div>
+                              <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '3px' }}>
+                                Perímetro no verificable (último GPS reportado: {distFromInst}m de sede).
+                              </div>
                             </div>
                           ) : (
                             <div style={{ fontSize: '11px', color: '#34d399', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -1005,11 +1055,27 @@ export default function RealTimeMonitor() {
                             </div>
                           )}
 
-                          {shiftOutside && (
+                          {shift.isOnline && shiftOutside && (
                             <div style={{ padding: '5px 8px', borderRadius: '6px', backgroundColor: 'rgba(239, 68, 68, 0.14)', border: '1px solid rgba(239, 68, 68, 0.4)', color: '#fca5a5', fontSize: '11.5px', fontWeight: 700 }}>
                               ⚠️ Fuera de Perímetro ({distFromInst}m / máx. {instRadius}m)
                             </div>
                           )}
+
+                          {/* Alerta de Turno Vencido si lleva > 14 horas abierto */}
+                          {(() => {
+                            const entryDate = shift.entryTime ? new Date(shift.entryTime) : null;
+                            const elapsedHours = entryDate && !isNaN(entryDate.getTime())
+                              ? Math.floor((Date.now() - entryDate.getTime()) / 3600000)
+                              : 0;
+                            if (elapsedHours >= 14 || (!shift.isOnline && elapsedHours >= 12)) {
+                              return (
+                                <div style={{ padding: '5px 8px', borderRadius: '6px', backgroundColor: 'rgba(245, 158, 11, 0.12)', border: '1px solid rgba(245, 158, 11, 0.35)', color: '#fde68a', fontSize: '11px', fontWeight: 700 }}>
+                                  ⚠️ Turno Vencido: Lleva {elapsedHours}h abierto (olvidó marcar salida)
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
 
                           <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: '1.4' }}>
                             Guardia con jornada iniciada. Disponible y a la espera de patrullar.
@@ -1067,6 +1133,25 @@ export default function RealTimeMonitor() {
                               </span>
                             </button>
                           </div>
+
+                          {/* Botón de cierre forzoso si está desconectado */}
+                          {(!shift.isOnline) && (
+                            <button
+                              onClick={() => handleForceCloseShift(shift.id, shift.guardName)}
+                              style={{
+                                ...styles.centerBtn,
+                                color: '#f87171',
+                                borderColor: 'rgba(239, 68, 68, 0.4)',
+                                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                                marginTop: '8px',
+                                width: '100%',
+                              }}
+                              title="Finaliza la jornada en la base de datos y la quita del monitoreo activo"
+                            >
+                              <XCircle size={13} />
+                              <span>Finalizar Turno Administrativamente</span>
+                            </button>
+                          )}
                         </div>
                       );
                     })}
