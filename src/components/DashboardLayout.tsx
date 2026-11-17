@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { LayoutDashboard, MapPin, AlertOctagon, Users, LogOut, Bell, Building2, Activity, X, ClipboardList, Megaphone, User, Camera, Upload } from 'lucide-react';
+import { LayoutDashboard, MapPin, AlertOctagon, Users, LogOut, Bell, Building2, Activity, X, ClipboardList, Megaphone, User, Camera, Upload, Info, AlertTriangle } from 'lucide-react';
 import { TokenService, api } from '../services/api';
 import logoImg from '../assets/logo.png';
 import { useToast } from '../context/ToastContext';
@@ -17,6 +17,7 @@ export default function DashboardLayout({ children, activeTab, onTabChange, titl
   const [user, setUser] = useState<any>(TokenService.getUser());
   const [showAnuncioModal, setShowAnuncioModal] = useState(false);
   const [anuncioMensaje, setAnuncioMensaje] = useState('');
+  const [anuncioPrioridad, setAnuncioPrioridad] = useState<'NORMAL' | 'URGENTE'>('NORMAL');
   const [enviandoAnuncio, setEnviandoAnuncio] = useState(false);
 
   // Profile modal states
@@ -355,16 +356,25 @@ export default function DashboardLayout({ children, activeTab, onTabChange, titl
 
   const handleSendAnuncio = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!anuncioMensaje.trim()) return;
+    const cleanMsg = anuncioMensaje.trim();
+    if (!cleanMsg) return;
     setEnviandoAnuncio(true);
     try {
+      const prefix = anuncioPrioridad === 'URGENTE' ? '🚨 [COMUNICADO URGENTE] ' : '📢 [AVISO ADMINISTRATIVO] ';
+      const payloadMensaje = `${prefix}${cleanMsg}`;
+
       await api.post('/api/incidents/anuncio', {
-        mensaje: anuncioMensaje,
+        mensaje: payloadMensaje,
         senderId: user?.userId || user?.id
       });
-      toast.success('Aviso administrativo emitido con éxito a todos los dispositivos');
+      toast.success(
+        anuncioPrioridad === 'URGENTE'
+          ? 'Comunicado urgente emitido con éxito a todos los dispositivos en servicio'
+          : 'Aviso administrativo emitido con éxito a todos los dispositivos'
+      );
       setShowAnuncioModal(false);
       setAnuncioMensaje('');
+      setAnuncioPrioridad('NORMAL');
     } catch (err) {
       console.error(err);
       toast.error('Error al emitir el aviso administrativo');
@@ -715,29 +725,94 @@ export default function DashboardLayout({ children, activeTab, onTabChange, titl
               <p style={{ color: '#94a3b8', fontSize: '13.5px', margin: 0, lineHeight: '1.5' }}>
                 Este mensaje se enviará como una notificación prioritaria a todos los guardias activos en terreno y aparecerá destacado en sus aplicaciones.
               </p>
+
+              {/* Selector de Prioridad (Normal / Urgente) */}
+              <div style={styles.inputGroup}>
+                <label style={styles.label}>Nivel de Prioridad</label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setAnuncioPrioridad('NORMAL')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      padding: '10px 14px',
+                      borderRadius: '8px',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      border: anuncioPrioridad === 'NORMAL' ? '1px solid #3b82f6' : '1px solid rgba(255, 255, 255, 0.1)',
+                      backgroundColor: anuncioPrioridad === 'NORMAL' ? 'rgba(37, 99, 235, 0.25)' : 'rgba(0, 0, 0, 0.2)',
+                      color: anuncioPrioridad === 'NORMAL' ? '#60a5fa' : '#94a3b8',
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    <Info size={16} color={anuncioPrioridad === 'NORMAL' ? '#60a5fa' : '#94a3b8'} />
+                    <span>Informativo (Normal)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setAnuncioPrioridad('URGENTE')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      padding: '10px 14px',
+                      borderRadius: '8px',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      border: anuncioPrioridad === 'URGENTE' ? '1px solid #ef4444' : '1px solid rgba(255, 255, 255, 0.1)',
+                      backgroundColor: anuncioPrioridad === 'URGENTE' ? 'rgba(239, 68, 68, 0.25)' : 'rgba(0, 0, 0, 0.2)',
+                      color: anuncioPrioridad === 'URGENTE' ? '#f87171' : '#94a3b8',
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    <AlertTriangle size={16} color={anuncioPrioridad === 'URGENTE' ? '#f87171' : '#94a3b8'} />
+                    <span>Urgente / Operativo</span>
+                  </button>
+                </div>
+              </div>
               
               <div style={styles.inputGroup}>
                 <label style={styles.label}>Mensaje del Anuncio</label>
                 <textarea
                   value={anuncioMensaje}
                   onChange={(e) => setAnuncioMensaje(e.target.value)}
-                  placeholder="ej. Reunión obligatoria de cambio de turno a las 18:00 hrs..."
+                  placeholder={anuncioPrioridad === 'URGENTE' ? 'ej. 🚨 Alerta: Reforzar control perimetral inmediato en sector norte...' : 'ej. 📢 Recordatorio: Reunión obligatoria de cambio de turno a las 18:00 hrs...'}
                   required
                   rows={4}
+                  maxLength={400}
                   style={{
                     backgroundColor: 'rgba(0, 0, 0, 0.2)', border: '1px solid rgba(255, 255, 255, 0.1)',
                     borderRadius: '8px', color: '#fff', padding: '12px', fontSize: '14px',
                     fontFamily: 'inherit', outline: 'none', resize: 'vertical', width: '100%',
                   }}
                 />
+                <div style={{ display: 'flex', justifyContent: 'flex-end', fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+                  {anuncioMensaje.length} / 400 caracteres
+                </div>
               </div>
 
               <div style={styles.modalActions}>
                 <button type="button" onClick={() => setShowAnuncioModal(false)} className="btn-secondary" style={styles.modalActionBtn}>
                   Cancelar
                 </button>
-                <button type="submit" className="btn-primary" style={styles.modalActionBtn} disabled={enviandoAnuncio}>
-                  {enviandoAnuncio ? 'Enviando...' : 'Emitir Comunicado'}
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  style={{
+                    ...styles.modalActionBtn,
+                    backgroundColor: anuncioPrioridad === 'URGENTE' ? '#dc2626' : undefined,
+                    boxShadow: anuncioPrioridad === 'URGENTE' ? '0 0 16px rgba(220, 38, 38, 0.4)' : undefined,
+                  }}
+                  disabled={enviandoAnuncio}
+                >
+                  {enviandoAnuncio ? 'Enviando...' : (anuncioPrioridad === 'URGENTE' ? '🚨 Emitir Urgente' : '📢 Emitir Comunicado')}
                 </button>
               </div>
             </form>
