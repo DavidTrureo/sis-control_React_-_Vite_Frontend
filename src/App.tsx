@@ -9,8 +9,9 @@ import UserManagement from './pages/UserManagement';
 import InstallationsManagement from './pages/InstallationsManagement';
 import SupervisorConsole from './pages/SupervisorConsole';
 import AuditLog from './pages/AuditLog';
+import LegalPage from './pages/LegalPage';
 
-type Tab = 'home' | 'monitor' | 'incidents' | 'users' | 'installations' | 'operations' | 'audit';
+type Tab = 'home' | 'monitor' | 'incidents' | 'users' | 'installations' | 'operations' | 'audit' | 'legal';
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -41,6 +42,19 @@ export default function App() {
     );
   }
 
+  // Rutas públicas legales accesibles sin autenticación
+  const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+  if (currentPath === '/privacidad' || currentPath === '/terminos') {
+    return (
+      <LegalPage
+        initialTab={currentPath === '/terminos' ? 'terms' : 'privacy'}
+        onBack={() => {
+          window.location.href = '/';
+        }}
+      />
+    );
+  }
+
   // Si no está autenticado, renderizar la pantalla de Login
   if (!isAuthenticated) {
     return <Login />;
@@ -66,6 +80,8 @@ export default function App() {
         return 'Consola de Control de Operaciones del Supervisor';
       case 'audit':
         return 'Bitácora de Auditoría del Sistema (Logs)';
+      case 'legal':
+        return 'Términos Legales y Privacidad';
       default:
         return 'SIS-CONTROL';
     }
@@ -88,6 +104,8 @@ export default function App() {
         return (userRole === 'ADMIN' || userRole === 'SUPERVISOR') ? <SupervisorConsole /> : <Home onNavigate={(tab) => setActiveTab(tab as Tab)} />;
       case 'audit':
         return userRole === 'ADMIN' ? <AuditLog /> : <Home onNavigate={(tab) => setActiveTab(tab as Tab)} />;
+      case 'legal':
+        return <LegalPage onBack={() => setActiveTab('home')} />;
       default:
         return <Home onNavigate={(tab) => setActiveTab(tab as Tab)} />;
     }

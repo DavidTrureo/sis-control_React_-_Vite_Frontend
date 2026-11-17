@@ -8,8 +8,8 @@ import { formatDateTime24h } from '../utils/dateUtils';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
-  activeTab: 'home' | 'monitor' | 'incidents' | 'users' | 'installations' | 'operations' | 'audit';
-  onTabChange: (tab: 'home' | 'monitor' | 'incidents' | 'users' | 'installations' | 'operations' | 'audit') => void;
+  activeTab: 'home' | 'monitor' | 'incidents' | 'users' | 'installations' | 'operations' | 'audit' | 'legal';
+  onTabChange: (tab: 'home' | 'monitor' | 'incidents' | 'users' | 'installations' | 'operations' | 'audit' | 'legal') => void;
   title: string;
 }
 
@@ -510,6 +510,16 @@ export default function DashboardLayout({ children, activeTab, onTabChange, titl
             <LogOut size={18} />
             <span>Cerrar Sesión</span>
           </button>
+
+          <div style={{ marginTop: '12px', textAlign: 'center', fontSize: '11px', color: '#475569' }}>
+            <a href="/privacidad" style={{ color: '#64748b', textDecoration: 'none', marginRight: '6px' }} onMouseEnter={(e) => (e.currentTarget.style.color = '#60a5fa')} onMouseLeave={(e) => (e.currentTarget.style.color = '#64748b')}>
+              Privacidad
+            </a>
+            <span>•</span>
+            <a href="/terminos" style={{ color: '#64748b', textDecoration: 'none', marginLeft: '6px' }} onMouseEnter={(e) => (e.currentTarget.style.color = '#60a5fa')} onMouseLeave={(e) => (e.currentTarget.style.color = '#64748b')}>
+              Términos
+            </a>
+          </div>
         </div>
       </aside>
 

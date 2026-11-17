@@ -156,6 +156,22 @@ export default function Login() {
             )}
           </button>
         </form>
+
+        {/* Footer Links Legales */}
+        <div style={{ marginTop: '24px', textAlign: 'center', borderTop: '1px solid rgba(255, 255, 255, 0.06)', paddingTop: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', fontSize: '12px' }}>
+            <a href="/privacidad" style={{ color: '#64748b', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={(e) => (e.currentTarget.style.color = '#60a5fa')} onMouseLeave={(e) => (e.currentTarget.style.color = '#64748b')}>
+              Política de Privacidad
+            </a>
+            <span style={{ color: '#334155' }}>•</span>
+            <a href="/terminos" style={{ color: '#64748b', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={(e) => (e.currentTarget.style.color = '#60a5fa')} onMouseLeave={(e) => (e.currentTarget.style.color = '#64748b')}>
+              Condiciones del Servicio
+            </a>
+          </div>
+          <p style={{ margin: '8px 0 0 0', fontSize: '11px', color: '#475569' }}>
+            SIS-Control • Plataforma de Seguridad Empresarial
+          </p>
+        </div>
       </div>
     </div>
   );
