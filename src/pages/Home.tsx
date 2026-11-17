@@ -887,7 +887,7 @@ export default function Home({ onNavigate }: HomeProps) {
               <div>
                 <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Footprints size={20} color="#3b82f6" />
-                  Auditoría de Recorrido de Ronda #{selectedRoundId}
+                  Auditoría de Recorrido de Ronda N° {selectedRoundId}
                 </h3>
                 <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#94a3b8' }}>
                   Detalle de puntos de control escaneados, justificaciones y fotografías

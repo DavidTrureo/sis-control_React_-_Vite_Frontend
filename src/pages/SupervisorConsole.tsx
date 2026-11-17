@@ -453,7 +453,7 @@ export default function SupervisorConsole() {
                     </div>
 
                     <div style={styles.opCardFooter}>
-                      <span style={styles.roundIdText}>Ronda ID: #{round.id}</span>
+                      <span style={styles.roundIdText}>Ronda N° {round.id}</span>
                       <button 
                         onClick={() => handleOpenCancelRound(round)}
                         style={styles.cancelRoundBtn}

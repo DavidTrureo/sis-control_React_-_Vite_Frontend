@@ -530,7 +530,7 @@ export default function AlertsAndIncidents() {
         <div style={styles.modalOverlay} onClick={() => setDetailIncident(null)}>
           <div className="glass-panel" style={{ ...styles.modalContent, maxWidth: '640px' }} onClick={(e) => e.stopPropagation()}>
             <div style={styles.modalHeader}>
-              <h3 style={styles.modalTitle}>Detalle del Incidente #{detailIncident.id}</h3>
+              <h3 style={styles.modalTitle}>Detalle del Incidente N° {detailIncident.id}</h3>
               <button onClick={() => setDetailIncident(null)} style={styles.closeBtn} title="Cerrar" aria-label="Cerrar">
                 <X size={20} color="#94a3b8" />
               </button>
@@ -609,7 +609,7 @@ export default function AlertsAndIncidents() {
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: '#64748b', fontSize: '13px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <CheckCircle size={14} color="#3b82f6" />
-                    <span>{detailIncident.type === 'JORNADA' ? `Jornada #${detailIncident.roundExecutionId}` : `Ronda #${detailIncident.roundExecutionId}`}</span>
+                    <span>{detailIncident.type === 'JORNADA' ? `Jornada N° ${detailIncident.roundExecutionId}` : `Ronda N° ${detailIncident.roundExecutionId}`}</span>
                   </div>
                   {detailIncident.type !== 'JORNADA' && (
                     <button
@@ -694,7 +694,7 @@ export default function AlertsAndIncidents() {
               <div>
                 <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Footprints size={20} color="#3b82f6" />
-                  Auditoría de Recorrido de Ronda #{selectedRoundId}
+                  Auditoría de Recorrido de Ronda N° {selectedRoundId}
                 </h3>
                 <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#94a3b8' }}>
                   Detalle de puntos de control escaneados, justificaciones y fotografías

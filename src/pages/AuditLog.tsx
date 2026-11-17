@@ -315,7 +315,7 @@ export default function AuditLog() {
                   <td style={styles.tdDetails}>
                     <span style={{ color: '#e2e8f0' }}>{log.details}</span>
                     {log.entityId && (
-                      <span style={styles.entityIdLabel}> (ID Ref: #{log.entityId})</span>
+                      <span style={styles.entityIdLabel}> (Ref: N° {log.entityId})</span>
                     )}
                   </td>
                 </tr>
