@@ -557,3 +557,4 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'background-color 0.2s',
   },
 };
+
