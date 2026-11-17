@@ -253,7 +253,7 @@ export default function UserManagement() {
             <tbody>
               {filteredUsers.map((user) => (
                 <tr key={user.id} style={styles.tableRow}>
-                  <td style={styles.td}>#{user.id}</td>
+                  <td style={styles.td}>N° {user.id}</td>
                   <td style={styles.tdName}>{user.fullName}</td>
                   <td style={styles.td}>
                     <div style={styles.emailBadge}>

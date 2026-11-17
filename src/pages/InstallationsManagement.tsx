@@ -542,7 +542,7 @@ export default function InstallationsManagement() {
                   <tbody>
                     {checkpoints.map((checkItem) => (
                       <tr key={checkItem.id} style={styles.tr}>
-                        <td style={styles.tdOrder}>#{checkItem.executionOrder}</td>
+                        <td style={styles.tdOrder}>N° {checkItem.executionOrder}</td>
                         <td style={styles.tdBold}>{checkItem.name}</td>
                         <td style={styles.td}>
                           <span style={styles.nfcBadge}>{checkItem.nfcTagCode}</span>
